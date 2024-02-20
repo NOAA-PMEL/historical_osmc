@@ -38,6 +38,7 @@ app.layout = ddk.App([
                 {'label': 'Jan 2020 - Feb 2020', 'value': '2020-01-01T00:00:00Z'},
                 {'label': 'Mar 2020 - Apr 2020', 'value': '2020-03-01T00:00:00Z'},
                 {'label': 'May 2020 - Jun 2020', 'value': '2020-05-01T00:00:00Z'},
+                {'label': 'Jul 2020 - Aug 2020', 'value': '2020-07-01T00:00:00Z'},
                 ], value='2020-01-01T00:00:00Z', clearable=False, multi=False)
             ]),
             ddk.ControlItem(label="Platform:", children=[
@@ -78,8 +79,9 @@ def show_locations(in_months):
 
     start_dt = dateutil.parser.isoparse(in_months)
     end_dt = start_dt + relativedelta(months=+2)
+    end_dt = end_dt - datetime.timedelta(days=1)
 
-    map_title = 'Last reported location for all platform during the period ' + start_dt.strftime('%Y-%m') + ' to ' + end_dt.strftime('%Y-%m')
+    map_title = 'Last reported location for all platform during the period ' + start_dt.strftime('%Y-%m-%d') + ' to ' + end_dt.strftime('%Y-%m-%d')
 
     location_df = db.get_time_range_locations_from_bq(start_dt.isoformat(), end_dt.isoformat())
     platform_color = {}
