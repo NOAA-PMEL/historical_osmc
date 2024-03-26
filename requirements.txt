@@ -8,4 +8,8 @@ db-dtypes
 colorcet
 cryptography
 redis
+celery==4.4.7
+diskcache
+psutil
+multiprocess
 dash_mantine_components

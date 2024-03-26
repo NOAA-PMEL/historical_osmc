@@ -42,10 +42,11 @@ def get_summary(start_time, end_time):
     '''.format(start_time, end_time)
     try: 
         df = client.query(summary).to_dataframe()
-        return df
+        tdf = df.groupby(['gid', 'latitude', 'longitude'], as_index=False).sum()
+        return df, tdf
     except Exception as e:
         print(e)
-        return None
+        return None, None
 
 def get_data_from_bq(platform, time0, time1): 
     try:
