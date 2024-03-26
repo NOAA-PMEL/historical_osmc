@@ -11,4 +11,5 @@ cryptography
 diskcache
 psutil
 multiprocess
+packaging==20.4
 dash_mantine_components
