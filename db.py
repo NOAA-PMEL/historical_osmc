@@ -21,6 +21,32 @@ with open('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json', 'w') as json_file:
 
 client = bigquery.Client()
 
+def get_summary(start_time, end_time):
+    summary = '''
+        SELECT
+            geo_id AS gid,
+            ST_X(ST_CENTROID(ANY_VALUE(geometry))) AS longitude,
+            ST_Y(ST_CENTROID(ANY_VALUE(geometry))) AS latitude,
+            ANY_VALUE(geometry) as cell,
+            platform_type,
+            COUNT(*) AS obs
+        FROM
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS obs,
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.grid-5-by-5` AS grid_cells
+        WHERE ST_CONTAINS(
+            grid_cells.geometry,
+            ST_GeogPoint(obs.longitude, obs.latitude)
+        ) and obs.time>='{}' and obs.time<='{}'
+        GROUP BY gid, platform_type
+        ORDER BY gid
+    '''.format(start_time, end_time)
+    try: 
+        df = client.query(summary).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return None
+
 def get_data_from_bq(platform, time0, time1): 
     try:
         t0 = time.time()
@@ -33,7 +59,7 @@ def get_data_from_bq(platform, time0, time1):
         df.loc[:,'trace_text'] = df['text_time'] + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
         t2 = time.time()
         print ("Read to DataFrame: %.4f | Add columns: %.4f | Rows %d " % (t1-t0, t2-t1, df.shape[0]))
-    except e:
+    except Exception as e:
         print(e)
     return df
 

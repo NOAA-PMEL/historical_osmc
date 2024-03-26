@@ -1,5 +1,5 @@
 dash-design-kit==1.6.7
-dash==2.3.1
+dash>=2.9
 gunicorn==20.0.4
 pandas==1.1.4
 redis
@@ -7,3 +7,5 @@ google-cloud-bigquery
 db-dtypes
 colorcet
 cryptography
+redis
+dash_mantine_components
