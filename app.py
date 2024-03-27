@@ -8,6 +8,7 @@ import redis
 import os
 import json
 import db
+import numpy as np
 
 import diskcache
 
@@ -61,9 +62,9 @@ app.layout = ddk.App([
                 ),
                 dmc.Text('Date Range:', p=8, fz=20),
                 dmc.Group(position='apart', children=[
-                    dcc.Input(id='start-date-picker', type="date", min='2020-01-01', max='2020-11-12', value='2020-01-01'),
+                    dcc.Input(id='start-date-picker', type="date", min='2020-01-01', max='2020-11-20', value='2020-01-01'),
                     dmc.Button(id='update', children='Update', radius="md", variant='outline'),
-                    dcc.Input(id='end-date-picker', type='date', min='2020-01-01', max='2020-11-12', value='2020-01-31')
+                    dcc.Input(id='end-date-picker', type='date', min='2020-01-01', max='2020-11-20', value='2020-01-31')
                 ])
             ], style={'height': '72vh'}),    
         ]),
@@ -111,12 +112,17 @@ def update_graph(platform_type, data_change, in_start_date, in_end_date):
         pdf = pd.concat(collection)
         pdf.groupby(['gid']).sum()
         platforms = ",".join(platform_type)
+    # There are no zeros because of the query pdf['mask'] = pdf.loc[:,pdf['obs'] == 0]
+    pdf['colorby'] = np.log10(pdf['obs'])
+    # pdf[:'obs'] = pdf.loc[pdf['mask']] = np.nan
     title = f'Count of observations of {platforms} from {in_start_date} to {in_end_date} in each 5\u00B0 x 5\u00B0 grid cell.'
-    figure = px.scatter_geo(pdf, lat="latitude", lon="longitude", color='obs', color_continuous_scale='Viridis',)
+    figure = px.scatter_geo(pdf, lat="latitude", lon="longitude", color='colorby', color_continuous_scale=px.colors.sequential.YlOrRd, 
+                                 hover_data={'colorby': False, 'latitude': True, 'longitude': True, 'obs': True})
     figure.update_traces(marker=dict(size=12))
-    figure.update_layout(margin={'t':25, 'b':25, 'l':0, 'r':0})
+    figure.update_layout(margin={'t':25, 'b':25, 'l':0, 'r':0}, 
+                         coloraxis_colorbar={'tickvals':[1,2,3,4,5,6,7], 'ticktext':['10', '100', '1K', '10K', '100K', '1000K', '10000K']})
     figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
-    figure.update_geos(showland=True, landcolor='tan', showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", coastlinecolor='black', coastlinewidth=1, resolution=50,
+    figure.update_geos(showland=True, landcolor='lightgrey', showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", coastlinecolor='black', coastlinewidth=1, resolution=50,
                     lataxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True}, lonaxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True})
     return [figure, title, 'data']
 
