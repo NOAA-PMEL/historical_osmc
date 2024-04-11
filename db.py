@@ -21,6 +21,70 @@ with open('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json', 'w') as json_file:
 
 client = bigquery.Client()
 
+def get_platforms(p_start_time, p_end_time):
+    platform_query = '''
+        SELECT 
+            DISTINCT platform_code
+        FROM
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations`
+        WHERE
+            time>='{}' and time<='{}'
+        ORDER BY
+            platform_code
+    '''.format(p_start_time, p_end_time)
+    try: 
+        df = client.query(platform_query).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return None
+
+def get_platform_data(start_time, end_time, in_platform_code):
+    platform_constraint = '("' + '","'.join(in_platform_code) + '")'
+    platform_data = '''
+        SELECT
+            *
+        FROM
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations`
+        WHERE platform_code IN {}
+    '''.format(platform_constraint)
+
+    try:
+        df = client.query(platform_data).to_dataframe()
+        df['platform_code'] = df['platform_code'].astype(str)
+        return df
+    except Exception as e:
+        print(e)
+        return None
+     
+        
+def get_summary_for_platform(start_time, end_time, in_platform_code):
+    platform_constraint = '("' + '","'.join(in_platform_code) + '")'
+    platform_summary = '''
+        SELECT
+            geo_id AS gid,
+            ST_X(ST_CENTROID(ANY_VALUE(geometry))) AS longitude,
+            ST_Y(ST_CENTROID(ANY_VALUE(geometry))) AS latitude,
+            ANY_VALUE(geometry) as cell,
+            COUNT(*) AS obs
+        FROM
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS obs,
+            `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.grid-5-by-5` AS grid_cells
+        WHERE ST_CONTAINS(
+            grid_cells.geometry,
+            ST_GeogPoint(obs.longitude, obs.latitude)
+        ) AND obs.time>='{}' AND obs.time<='{}' AND platform_code IN {}
+        GROUP BY gid
+        ORDER BY gid
+    '''.format(start_time, end_time, platform_constraint)
+    try:
+        df = client.query(platform_summary).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return None
+
+
 def get_summary(start_time, end_time):
     summary = '''
         SELECT

@@ -14,3 +14,4 @@ multiprocess
 packaging==20.4
 importlib-metadata==4.13.0
 dash_mantine_components
+dash-ag-grid
