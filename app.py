@@ -11,6 +11,7 @@ import os
 import json
 import db
 import numpy as np
+import datetime
 
 import constants
 
@@ -59,6 +60,7 @@ for var in constants.data_variables:
 app.layout = ddk.App([
     dcc.Store('data-change'),
     dcc.Store('platform-data'),
+    dcc.Store('week-data'),
     ddk.Header([
         ddk.Logo(src=app.get_asset_url('OSMC_logo.png')),
         ddk.Title('Summary Information for the Historical OSMC'),
@@ -69,6 +71,7 @@ app.layout = ddk.App([
         dmc.TabsList(
             [
                 dmc.Tab("Summary Map", value="summary"),
+                dmc.Tab('Observations per Week', 'byweek'),
                 dmc.Tab("Individual Platforms", value="platform"),
             ]
         ),
@@ -100,6 +103,56 @@ app.layout = ddk.App([
                         ]),
                         dmc.CardSection(children=[
                             dcc.Graph(id='update-graph', style={'height': '65vh'}),
+                        ])
+                    ])
+                ])
+            ]),
+        ]),
+          dmc.TabsPanel(value='byweek', children = [
+            dmc.Grid(children=[
+                dmc.Col(span=3, children=[
+                    dmc.Card([
+                        dmc.Text('Percentage of Weeks with', p=12, fz=28),
+                        dmc.Text('At least', p=8, fz=20),
+                        dmc.TextInput(id='min-obs', placeholder='Enter minimum observations', type='number'),
+                        dmc.Text('observations of', p=8, fz=20),
+                        dmc.Select(
+                            id='week-parameter',
+                            data=parameter_options,
+                            value='sst',
+                            dropdownPosition='bottom',
+                            searchable=True,
+                            nothingFound="No variable matches this search.",
+                            clearable=False,
+                        ),
+                        dmc.Text('in each', p=8, fz=20),
+                        dmc.Select(id='gridsize',
+                                   data=[
+                                       {'label': '5\u00B0 x 5\u00B0 Grid Cell', 'value': 5}
+                                   ], value=5),
+                        dmc.Text('for date range:', p=8, fz=20),
+                        dmc.Group(position='apart', children=[
+                            dcc.Input(id='week-start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
+                            dmc.Button(id='week-update', children='Update', radius="md", variant='outline'),
+                            dcc.Input(id='week-end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
+                        ]),
+                        dmc.Text('by'),
+                        dmc.Select(
+                            id='week-platform',
+                            data=platform_options,
+                            dropdownPosition='bottom',
+                            clearable=False,
+                            value='VOSCLIM'
+                        ),
+                    ], style={'height': '72vh'}),    
+                ]),
+                dmc.Col(span=9, children=[
+                    dmc.Card(id='percent-map-card', children=[
+                        dmc.CardSection(children=[
+                            dmc.Text(id='percent-map-title', children='A Plot', p=12, fz=28)
+                        ]),
+                        dmc.CardSection(children=[
+                            dcc.Loading(dcc.Graph(id='percent-map', style={'height': '65vh'})),
                         ])
                     ])
                 ])
@@ -169,7 +222,76 @@ def update_platform_data(in_platform_code):
         return ['data']
 
 
+@app.callback(
+    [
+        Output('week-data', 'data')
+    ],
+    [
+        Input('week-update', 'n_clicks')
+    ],
+    [
+        State('min-obs', 'value'),
+        State('week-start-date-picker', 'value'),
+        State('week-end-date-picker', 'value'),
+        State('week-parameter', 'value')
+    ], prevent_initial_call=True
+)
+def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_var):
+    
+    d1 = datetime.datetime.strptime(in_week_start, '%Y-%m-%d')
+    d2 = datetime.datetime.strptime(in_week_end, '%Y-%m-%d')
 
+    sunday1 = (d1 - datetime.timedelta(days=d1.weekday())) - datetime.timedelta(days=1)
+    sunday2 = (d2 - datetime.timedelta(days=d2.weekday())) - datetime.timedelta(days=1)
+
+    if min_nobs is None or not min_nobs.isdigit():
+        return exceptions.PreventUpdate
+    df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var, min_nobs)
+    redis_instance.hset("cache", "week_data", json.dumps(df.to_json()))
+    return ['data']
+
+
+@app.callback(
+    [
+        Output('percent-map', 'figure'),
+        Output('percent-map-title', 'children')
+    ],
+    [
+        Input('week-data', 'data'),
+        Input('week-platform', 'value')
+    ],
+    [
+        State('week-start-date-picker', 'value'),
+        State('week-end-date-picker', 'value'),
+        State('min-obs', 'value'),
+        State('week-parameter', 'value')
+    ], prevent_initial_call=True
+)
+def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
+    df = pd.read_json(json.loads(redis_instance.hget("cache", "week_data")))
+    
+    d1 = datetime.datetime.strptime(week_start, '%Y-%m-%d')
+    d2 = datetime.datetime.strptime(week_end, '%Y-%m-%d')
+
+    sunday1 = (d1 - datetime.timedelta(days=d1.weekday())) - datetime.timedelta(days=1)
+    sunday2 = (d2 - datetime.timedelta(days=d2.weekday())) - datetime.timedelta(days=1)
+    s1f = sunday1.strftime('%Y-%m-%d')
+    s2f = sunday2.strftime('%Y-%m-%d')    
+    weeks = (sunday2 - sunday1).days / 7
+    
+    df['percent'] = (df['weeks_greater']/weeks)*100.0
+    df['percent'] = df['percent'].astype(int)
+
+    pdf = df.loc[df['platform_type'] == in_plat]
+    title = f'Percent of weeks (from Sunday, {s1f} to Sunday, {s2f}) in each 5\u00B0 x 5\u00B0 cell with at least {in_min_nobs} {in_plat} observations of {in_var}.'
+    figure = px.scatter_geo(pdf, lat="latitude", lon="longitude", color='percent', color_continuous_scale=px.colors.sequential.YlOrRd, 
+                                hover_data={'latitude': True, 'longitude': True, 'percent': True}, range_color=[0,100])
+    figure.update_traces(marker=dict(size=8))
+    figure.update_layout(margin={'t':45, 'b':25, 'l':0, 'r':0},)
+    figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
+    figure.update_geos(showland=True, landcolor='lightgrey', showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", coastlinecolor='black', coastlinewidth=1, resolution=50,
+                    lataxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True}, lonaxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True},)
+    return [figure, title]
 @app.callback(
     [
         Output('platform-summary-bar', 'figure'),

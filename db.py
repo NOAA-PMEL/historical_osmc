@@ -85,6 +85,39 @@ def get_summary_for_platform(start_time, end_time, in_platform_code):
         return None
 
 
+def counts_by_week(start_time, end_time, parameter, min_obs):
+
+    week_count = '''
+        SELECT w.platform_type, count(w.obs) as weeks_greater, w.gid, w.latitude, w.longitude FROM
+        (   
+            SELECT
+                geo_id AS gid,
+                ST_X(ST_CENTROID(ANY_VALUE(geometry))) AS longitude,
+                ST_Y(ST_CENTROID(ANY_VALUE(geometry))) AS latitude,
+                ANY_VALUE(geometry) as cell,
+                platform_type,
+                COUNT('{}') AS obs,
+                EXTRACT(WEEK from time) as week
+            FROM
+                `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS obs,
+                `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.grid-5-by-5` AS grid_cells
+            WHERE ST_CONTAINS(
+                grid_cells.geometry,
+                ST_GeogPoint(obs.longitude, obs.latitude)
+            ) and obs.time>='{}' and obs.time<='{}' and EXTRACT(week from time) > 0
+            GROUP BY gid, platform_type, week
+            ORDER BY gid
+        ) w
+        WHERE w.obs > {} GROUP BY w.gid, w.latitude, w.longitude, w.platform_type
+        '''.format(parameter, start_time, end_time, min_obs)
+    try: 
+        df = client.query(week_count).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return None
+
+
 def get_summary(start_time, end_time):
     summary = '''
         SELECT
@@ -112,11 +145,11 @@ def get_summary(start_time, end_time):
         print(e)
         return None, None
 
+
 def get_data_from_bq(platform, time0, time1): 
     try:
         t0 = time.time()
         sql = 'SELECT * FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` WHERE platform_code="' + platform + '" AND time>="' + time0 + '" AND time<"' + time1 +'" ORDER BY `time`'
-        print(sql)
         df = client.query(sql).to_dataframe()
         t1 = time.time()
         df.loc[:,'millis'] = pd.to_datetime(df['time']).view(np.int64)
