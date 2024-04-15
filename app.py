@@ -53,9 +53,15 @@ platforms = df['platform_type'].unique()
 for platform in sorted(platforms):
     platform_options.append({'label': platform, 'value': platform})
 
+week_platform_options = platform_options.copy()
+del week_platform_options[0]
+
 parameter_options = []
-for var in constants.data_variables:
-    parameter_options.append({'label': constants.long_names[var], 'value': var})
+# Iterate all long names dictionary sort by value (the long name)
+
+for key, value in sorted(constants.long_names.items(), key=lambda x: x[1].lower()):
+    if key in constants.data_variables:
+        parameter_options.append({'label': constants.long_names[key], 'value': key})
 
 app.layout = ddk.App([
     dcc.Store('data-change'),
@@ -136,25 +142,37 @@ app.layout = ddk.App([
                             dmc.Button(id='week-update', children='Update', radius="md", variant='outline'),
                             dcc.Input(id='week-end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
                         ]),
-                        dmc.Text('by'),
-                        dmc.Select(
-                            id='week-platform',
-                            data=platform_options,
-                            dropdownPosition='bottom',
-                            clearable=False,
-                            value='VOSCLIM'
-                        ),
+                        dmc.Group(position='center', children=[
+                            dcc.Loading(html.Div(id='bigq-loader', style={'visibility': 'hidden'}))                         
+                        ], mt=30)
                     ], style={'height': '72vh'}),    
                 ]),
                 dmc.Col(span=9, children=[
+                    dmc.Card(children=[
+
+                    ]),
                     dmc.Card(id='percent-map-card', children=[
+                        dmc.CardSection([
+                            dmc.Group(children=[
+                                dmc.Text('as observed by platform: ', ml=15),
+                                dmc.Select(
+                                    style={'width': 400},
+                                    # styles={"dropdown": {"z-index": 1400, "background-color": "pink"}},
+                                    id='week-platform',
+                                    data=week_platform_options,
+                                    dropdownPosition='bottom',
+                                    clearable=False,
+                                    value='VOSCLIM'
+                                ),
+                            ])
+                        ]),
                         dmc.CardSection(children=[
                             dmc.Text(id='percent-map-title', children='A Plot', p=12, fz=28)
                         ]),
                         dmc.CardSection(children=[
                             dcc.Loading(dcc.Graph(id='percent-map', style={'height': '65vh'})),
                         ])
-                    ])
+                    ], )
                 ])
             ]),
         ]),
@@ -224,7 +242,8 @@ def update_platform_data(in_platform_code):
 
 @app.callback(
     [
-        Output('week-data', 'data')
+        Output('week-data', 'data'),
+        Output('bigq-loader', 'children')
     ],
     [
         Input('week-update', 'n_clicks')
@@ -237,18 +256,26 @@ def update_platform_data(in_platform_code):
     ], prevent_initial_call=True
 )
 def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_var):
-    
     d1 = datetime.datetime.strptime(in_week_start, '%Y-%m-%d')
     d2 = datetime.datetime.strptime(in_week_end, '%Y-%m-%d')
 
-    sunday1 = (d1 - datetime.timedelta(days=d1.weekday())) - datetime.timedelta(days=1)
-    sunday2 = (d2 - datetime.timedelta(days=d2.weekday())) - datetime.timedelta(days=1)
+    # If not on a Sunday, move back to previous Sunday
+    weekday1 = d1.weekday()
+    weekday2 = d2.weekday()
+    if weekday1 < 6:
+        sunday1 = (d1 - datetime.timedelta(days=weekday1)) - datetime.timedelta(days=1)
+    else:
+        sunday1 = d1
+    if weekday2 < 6:
+        sunday2 = (d2 - datetime.timedelta(days=weekday2)) - datetime.timedelta(days=1)
+    else:
+        sunday2 = d2
 
     if min_nobs is None or not min_nobs.isdigit():
         return exceptions.PreventUpdate
     df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var, min_nobs)
     redis_instance.hset("cache", "week_data", json.dumps(df.to_json()))
-    return ['data']
+    return ['data', '']
 
 
 @app.callback(
@@ -273,8 +300,18 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
     d1 = datetime.datetime.strptime(week_start, '%Y-%m-%d')
     d2 = datetime.datetime.strptime(week_end, '%Y-%m-%d')
 
-    sunday1 = (d1 - datetime.timedelta(days=d1.weekday())) - datetime.timedelta(days=1)
-    sunday2 = (d2 - datetime.timedelta(days=d2.weekday())) - datetime.timedelta(days=1)
+    # If not on a Sunday, move back to previous Sunday
+    weekday1 = d1.weekday()
+    weekday2 = d2.weekday()
+    if weekday1 < 6:
+        sunday1 = (d1 - datetime.timedelta(days=weekday1)) - datetime.timedelta(days=1)
+    else:
+        sunday1 = d1
+    if weekday2 < 6:
+        sunday2 = (d2 - datetime.timedelta(days=weekday2)) - datetime.timedelta(days=1)
+    else:
+        sunday2 = d2
+
     s1f = sunday1.strftime('%Y-%m-%d')
     s2f = sunday2.strftime('%Y-%m-%d')    
     weeks = (sunday2 - sunday1).days / 7

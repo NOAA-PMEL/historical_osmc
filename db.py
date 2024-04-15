@@ -99,18 +99,18 @@ def counts_by_week(start_time, end_time, parameter, min_obs):
                 COUNT('{}') AS obs,
                 EXTRACT(WEEK from time) as week
             FROM
-                `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS obs,
+                `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS nobs,
                 `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.grid-5-by-5` AS grid_cells
             WHERE ST_CONTAINS(
                 grid_cells.geometry,
-                ST_GeogPoint(obs.longitude, obs.latitude)
-            ) and obs.time>='{}' and obs.time<='{}' and EXTRACT(week from time) > 0
+                ST_GeogPoint(nobs.longitude, nobs.latitude)
+            ) and nobs.time>='{}' and nobs.time<='{}' and EXTRACT(week from time) > 0 AND nobs.{} IS NOT NULL
             GROUP BY gid, platform_type, week
             ORDER BY gid
         ) w
         WHERE w.obs > {} GROUP BY w.gid, w.latitude, w.longitude, w.platform_type
-        '''.format(parameter, start_time, end_time, min_obs)
-    try: 
+        '''.format(parameter, start_time, end_time, parameter, min_obs)
+    try:
         df = client.query(week_count).to_dataframe()
         return df
     except Exception as e:
@@ -156,7 +156,7 @@ def get_data_from_bq(platform, time0, time1):
         df.loc[:,'text_time'] = df['time'].astype(str)
         df.loc[:,'trace_text'] = df['text_time'] + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
         t2 = time.time()
-        print ("Read to DataFrame: %.4f | Add columns: %.4f | Rows %d " % (t1-t0, t2-t1, df.shape[0]))
+        # print ("Read to DataFrame: %.4f | Add columns: %.4f | Rows %d " % (t1-t0, t2-t1, df.shape[0]))
     except Exception as e:
         print(e)
     return df
