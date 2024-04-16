@@ -70,7 +70,6 @@ app.layout = ddk.App([
     ddk.Header([
         ddk.Logo(src=app.get_asset_url('OSMC_logo.png')),
         ddk.Title('Summary Information for the Historical OSMC'),
-        dcc.Loading(html.Div(id='loader', style={'display': 'none'}))
     ]),
     dmc.Tabs(
     [
@@ -99,7 +98,10 @@ app.layout = ddk.App([
                             dcc.Input(id='start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
                             dmc.Button(id='update', children='Update', radius="md", variant='outline'),
                             dcc.Input(id='end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
-                        ])
+                        ]),
+                        dmc.Group(position='center', children=[
+                            dcc.Loading(html.Div(id='loader', style={'display': 'none'}))
+                        ], mt=30)
                     ], style={'height': '72vh'}),    
                 ]),
                 dmc.Col(span=9, children=[
@@ -108,7 +110,7 @@ app.layout = ddk.App([
                             dmc.Text(id='graph-title', children='A Plot', p=12, fz=28)
                         ]),
                         dmc.CardSection(children=[
-                            dcc.Graph(id='update-graph', style={'height': '65vh'}),
+                            dcc.Loading(dcc.Graph(id='update-graph', style={'height': '65vh'})),
                         ])
                     ])
                 ])
@@ -143,14 +145,11 @@ app.layout = ddk.App([
                             dcc.Input(id='week-end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
                         ]),
                         dmc.Group(position='center', children=[
-                            dcc.Loading(html.Div(id='bigq-loader', style={'visibility': 'hidden'}))                         
+                            dcc.Loading(html.Div(id='bigq-loader', style={'display': 'none'}))                         
                         ], mt=30)
                     ], style={'height': '72vh'}),    
                 ]),
                 dmc.Col(span=9, children=[
-                    dmc.Card(children=[
-
-                    ]),
                     dmc.Card(id='percent-map-card', children=[
                         dmc.CardSection([
                             dmc.Group(children=[
@@ -325,7 +324,7 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
                                 hover_data={'latitude': True, 'longitude': True, 'percent': True}, range_color=[0,100])
     figure.update_traces(marker=dict(size=8))
     figure.update_layout(margin={'t':45, 'b':25, 'l':0, 'r':0},)
-    figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None})
+    figure.update_coloraxes(colorbar={'orientation':'h', 'thickness':20, 'y': -.175, 'title': None,})
     figure.update_geos(showland=True, landcolor='lightgrey', showocean=True, oceancolor="#9bedff", showlakes=True, lakecolor="#9bedff", coastlinecolor='black', coastlinewidth=1, resolution=50,
                     lataxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True}, lonaxis={'dtick':5, 'gridcolor': '#eee', "showgrid": True},)
     return [figure, title]
