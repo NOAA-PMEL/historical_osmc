@@ -228,7 +228,7 @@ app.layout = ddk.App([
     ],
     [
         Input('platform-code', 'value')
-    ]
+    ], background=True
 )
 def update_platform_data(in_platform_code):
     if in_platform_code is None or len(in_platform_code) == 0:
@@ -252,7 +252,7 @@ def update_platform_data(in_platform_code):
         State('week-start-date-picker', 'value'),
         State('week-end-date-picker', 'value'),
         State('week-parameter', 'value')
-    ], prevent_initial_call=True
+    ], prevent_initial_call=True, background=True
 )
 def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_var):
     d1 = datetime.datetime.strptime(in_week_start, '%Y-%m-%d')
