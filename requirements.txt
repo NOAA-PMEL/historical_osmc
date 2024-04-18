@@ -13,5 +13,5 @@ psutil
 multiprocess
 packaging==20.4
 importlib-metadata==4.13.0
-dash_mantine_components
+dash_mantine_components==0.12.1
 dash-ag-grid
