@@ -23,6 +23,7 @@ from celery import Celery
 dataset_start = '2020-01-01'
 dataset_end = '2020-11-20'
 dataset_future = '2075-12-31'
+plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 
 celery_app = Celery(broker=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"), backend=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
 if os.environ.get("DASH_ENTERPRISE_ENV") == "WORKSPACE":
@@ -63,6 +64,29 @@ for key, value in sorted(constants.long_names.items(), key=lambda x: x[1].lower(
     if key in constants.data_variables:
         parameter_options.append({'label': constants.long_names[key], 'value': key})
 
+
+def get_blank(message):
+    blank_graph = go.Figure(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
+    blank_graph.add_trace(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
+    blank_graph.update_traces(visible=False)
+    blank_graph.update_layout(
+        xaxis={"visible": False},
+        yaxis={"visible": False},
+        title=message,
+        plot_bgcolor=plot_bg,
+        annotations=[
+            {
+                "text": message,
+                "xref": "paper",
+                "yref": "paper",
+                "showarrow": False,
+                "font": {
+                    "size": 14
+                }
+            },
+        ]
+    )
+    return blank_graph
 app.layout = ddk.App([
     dcc.Store('data-change'),
     dcc.Store('platform-data'),
@@ -107,10 +131,14 @@ app.layout = ddk.App([
                 dmc.Col(span=9, children=[
                     dmc.Card(id='one-graph-card', children=[
                         dmc.CardSection(children=[
-                            dmc.Text(id='graph-title', children='A Plot', p=12, fz=28)
+                            dmc.Text(id='graph-title', children='', p=12, fz=28)
                         ]),
                         dmc.CardSection(children=[
-                            dcc.Loading(dcc.Graph(id='update-graph', style={'height': '65vh'})),
+                            dcc.Loading(dcc.Graph(
+                                id='update-graph', 
+                                style={'height': '65vh'},
+                                figure=get_blank('Select the date range of interest and click the "Update" button.'))
+                            ),
                         ])
                     ])
                 ])
@@ -166,10 +194,14 @@ app.layout = ddk.App([
                             ])
                         ]),
                         dmc.CardSection(children=[
-                            dmc.Text(id='percent-map-title', children='A Plot', p=12, fz=28)
+                            dmc.Text(id='percent-map-title', children='', p=12, fz=28)
                         ]),
                         dmc.CardSection(children=[
-                            dcc.Loading(dcc.Graph(id='percent-map', style={'height': '65vh'})),
+                            dcc.Loading(dcc.Graph(
+                                id='percent-map', 
+                                style={'height': '65vh'},
+                                figure=get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'))
+                            ),
                         ])
                     ], )
                 ])
@@ -190,7 +222,7 @@ app.layout = ddk.App([
                             clearable=False,
                         ),
                         dmc.Text('Data Plot Selection', p=12, fz=28),
-                        dmc.Text('Parameters:', p=8, fz=20),
+                        dmc.Text('Parameter:', p=8, fz=20),
                         dmc.Select(
                             id='parameter',
                             data=parameter_options,
@@ -205,13 +237,25 @@ app.layout = ddk.App([
                 dmc.Col(span=9, children=[
                     dmc.Grid(children=[
                         dmc.Col(span=6, children=[
-                            dcc.Loading(dcc.Graph(id='platform-summary-map'))
+                            dcc.Loading(dcc.Graph(
+                                    id='platform-summary-map',
+                                    figure=get_blank('Type in or select a WMO ID for the desired platform.')
+                                )
+                            )
                         ]),
                         dmc.Col(span=6, children=[
-                            dcc.Loading(dcc.Graph(id='platform-summary-bar'))
+                            dcc.Loading(dcc.Graph(
+                                    id='platform-summary-bar',
+                                    figure=get_blank('')
+                                )
+                            )
                         ]),
                         dmc.Col(span=12, children=[
-                            dcc.Loading(dcc.Graph(id='data-plot'))
+                            dcc.Loading(dcc.Graph(
+                                    id='data-plot',
+                                    figure=get_blank('')
+                                )
+                            )
                         ])
                     ])
                 ])
@@ -273,6 +317,7 @@ def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_v
     if min_nobs is None or not min_nobs.isdigit():
         return exceptions.PreventUpdate
     df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var, min_nobs)
+    print(df)
     redis_instance.hset("cache", "week_data", json.dumps(df.to_json()))
     return ['data', '']
 
