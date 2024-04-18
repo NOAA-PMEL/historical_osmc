@@ -85,11 +85,9 @@ def get_summary_for_platform(start_time, end_time, in_platform_code):
         return None
 
 
-def counts_by_week(start_time, end_time, parameter, min_obs):
+def counts_by_week(start_time, end_time, parameter):
 
-    week_count = '''
-        SELECT w.platform_type, count(w.obs) as weeks_greater, w.gid, w.latitude, w.longitude FROM
-        (   
+    week_count = '''  
             SELECT
                 geo_id AS gid,
                 ST_X(ST_CENTROID(ANY_VALUE(geometry))) AS longitude,
@@ -106,10 +104,8 @@ def counts_by_week(start_time, end_time, parameter, min_obs):
                 ST_GeogPoint(nobs.longitude, nobs.latitude)
             ) and nobs.time>='{}' and nobs.time<='{}' and EXTRACT(week from time) > 0 AND nobs.{} IS NOT NULL
             GROUP BY gid, platform_type, week
-            ORDER BY gid
-        ) w
-        WHERE w.obs > {} GROUP BY w.gid, w.latitude, w.longitude, w.platform_type
-        '''.format(parameter, start_time, end_time, parameter, min_obs)
+            ORDER BY gid     
+        '''.format(parameter, start_time, end_time, parameter)
     try:
         df = client.query(week_count).to_dataframe()
         return df

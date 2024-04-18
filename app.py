@@ -54,9 +54,6 @@ platforms = df['platform_type'].unique()
 for platform in sorted(platforms):
     platform_options.append({'label': platform, 'value': platform})
 
-week_platform_options = platform_options.copy()
-del week_platform_options[0]
-
 parameter_options = []
 # Iterate all long names dictionary sort by value (the long name)
 
@@ -182,14 +179,15 @@ app.layout = ddk.App([
                         dmc.CardSection([
                             dmc.Group(children=[
                                 dmc.Text('as observed by platform: ', ml=15),
-                                dmc.Select(
+                                dmc.MultiSelect(
                                     style={'width': 400},
+                                    searchable=True,
                                     # styles={"dropdown": {"z-index": 1400, "background-color": "pink"}},
                                     id='week-platform',
-                                    data=week_platform_options,
+                                    data=platform_options,
                                     dropdownPosition='bottom',
                                     clearable=False,
-                                    value='VOSCLIM'
+                                    value=['VOSCLIM']
                                 ),
                             ])
                         ]),
@@ -316,8 +314,7 @@ def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_v
 
     if min_nobs is None or not min_nobs.isdigit():
         return exceptions.PreventUpdate
-    df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var, min_nobs)
-    print(df)
+    df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var)
     redis_instance.hset("cache", "week_data", json.dumps(df.to_json()))
     return ['data', '']
 
@@ -339,6 +336,10 @@ def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_v
     ], prevent_initial_call=True
 )
 def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
+
+    if in_min_nobs is None or len(in_min_nobs) == 0:
+        return [get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'), '']
+
     df = pd.read_json(json.loads(redis_instance.hget("cache", "week_data")))
     
     d1 = datetime.datetime.strptime(week_start, '%Y-%m-%d')
@@ -359,13 +360,19 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
     s1f = sunday1.strftime('%Y-%m-%d')
     s2f = sunday2.strftime('%Y-%m-%d')    
     weeks = (sunday2 - sunday1).days / 7
+
+    # Get specificed platforms
+    if 'all' not in in_plat:
+        df = df.loc[df['platform_type'].isin(in_plat)]
+    # count
+    df = df.groupby(['gid', 'latitude', 'longitude', 'cell', 'platform_type', 'week'], as_index=False).sum(['obs'])
+    df = df.loc[df['obs'] > int(in_min_nobs)].groupby(['gid', 'latitude', 'longitude', 'cell', 'platform_type', 'week'], as_index=False).count()
     
-    df['percent'] = (df['weeks_greater']/weeks)*100.0
+    df['percent'] = (df['week']/weeks)*100.0
     df['percent'] = df['percent'].astype(int)
 
-    pdf = df.loc[df['platform_type'] == in_plat]
     title = f'Percent of weeks (from Sunday, {s1f} to Sunday, {s2f}) in each 5\u00B0 x 5\u00B0 cell with at least {in_min_nobs} {in_plat} observations of {in_var}.'
-    figure = px.scatter_geo(pdf, lat="latitude", lon="longitude", color='percent', color_continuous_scale=px.colors.sequential.YlOrRd, 
+    figure = px.scatter_geo(df, lat="latitude", lon="longitude", color='percent', color_continuous_scale=px.colors.sequential.YlOrRd, 
                                 hover_data={'latitude': True, 'longitude': True, 'percent': True}, range_color=[0,100])
     figure.update_traces(marker=dict(size=8))
     figure.update_layout(margin={'t':45, 'b':25, 'l':0, 'r':0},)
