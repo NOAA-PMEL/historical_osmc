@@ -1,110 +1,22 @@
 import redis
 import os
+import json
 
 ESRI_API_KEY = os.environ.get('ESRI_API_KEY')
 redis_instance = redis.StrictRedis.from_url(
     os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
 )
 
-data_variables = [
-    "sst",
-    "atmp",
-    "precip",
-    "sss",
-    "ztmp",
-    "zsal",
-    "slp",
-    "windspd",
-    "winddir",
-    "wvht",
-    "waterlevel",
-    "clouds",
-    "dewpoint",
-    "uo",
-    "vo",
-    "wo",
-    "rainfall_rate",
-    "hur",
-    "sea_water_elec_conductivity",
-    "sea_water_pressure",
-    "rlds",
-    "rsds",
-    "waterlevel_met_res",
-    "waterlevel_wrt_lcd",
-    "water_col_ht",
-    "wind_to_direction",
-]
+all_variables = []
+long_names = {}
 
-long_names = {
-       "platform_code":  "WMO id or Ship call sign",
-       "platform_type":  "platform type",
-       "country":  "country",
-       "time":  "observation date",
-       "latitude":  "Latitude",
-       "longitude":  "Longitude",
-       "observation_depth":  "observation depth",
-       "sst":  "sea surface temperature",
-       "atmp":  "air temperature",
-       "precip":  "precipitation",
-       "sss":  "sea surface salinity",
-       "ztmp":  "profile water temperature",
-       "zsal":  "profile salinity",
-       "slp":  "sea level pressure",
-       "windspd":  "wind speed",
-       "winddir":  "wind from direction",
-       "wvht":  "sea surface wave significant height",
-       "waterlevel":  "waterlevel",
-       "clouds":  "cloud cover",
-       "dewpoint":  "dew point temperature",
-       "uo":  "eastward sea water velocity",
-       "vo":  "northward sea water velocity",
-       "wo":  "upward sea water velocity",
-       "rainfall_rate":  "rainfall rate",
-       "hur":  "relative humidity",
-       "sea_water_elec_conductivity":  "sea water electrical conductivity",
-       "sea_water_pressure":  "sea water pressure",
-       "rlds":  "surface downwelling longwave flux in air",
-       "rsds":  "surface downwelling shortwave flux in air",
-       "waterlevel_met_res":  "meteorological residual tidal elevation",
-       "waterlevel_wrt_lcd":  "tidal elevation WRT local chart datum",
-       "water_col_ht":  "water column height",
-       "wind_to_direction":  "wind to direction",
-}
+with open('schema.json', "r") as fp:
+    schema = json.load(fp)
 
-all_variables = [
-    "platform_id",
-    "platform_code",
-    "platform_type",
-    "country",
-    "time",
-    "latitude",
-    "longitude",
-    "observation_depth",
-    "sst",
-    "atmp",
-    "precip",
-    "sss",
-    "ztmp",
-    "zsal",
-    "slp",
-    "windspd",
-    "winddir",
-    "wvht",
-    "waterlevel",
-    "clouds",
-    "dewpoint",
-    "uo",
-    "vo",
-    "wo",
-    "rainfall_rate",
-    "hur",
-    "sea_water_elec_conductivity",
-    "sea_water_pressure",
-    "rlds",
-    "rsds",
-    "waterlevel_met_res",
-    "waterlevel_wrt_lcd",
-    "water_col_ht",
-    "wind_to_direction",
-    "lon360",
-]
+for var in schema:
+    all_variables.append(var['name'])
+    long_names[var['name']] = var['description']
+
+meta_variables = ['latitude', 'longitude', 'observation_date', 'observation_depth', 'lon360', 'platform_code', 'platform_type', 'country', 'platform_id', 'longitude360']
+
+data_variables = [x for x in all_variables if (x not in meta_variables)]

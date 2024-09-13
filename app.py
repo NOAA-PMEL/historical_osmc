@@ -1,6 +1,6 @@
-from dash import Dash, dcc, html, Input, Output, State, no_update, DiskcacheManager, CeleryManager, exceptions
+from dash import dcc, html, Input, Output, State, no_update, DiskcacheManager, CeleryManager, exceptions
+from dash_enterprise_libraries import EnterpriseDash
 import plotly
-import dash_mantine_components as dmc
 import dash_design_kit as ddk
 import dash_ag_grid as dag
 import plotly.express as px
@@ -17,11 +17,10 @@ import constants
 
 import diskcache
 
-import celery
 from celery import Celery
 
 dataset_start = '2020-01-01'
-dataset_end = '2020-11-20'
+dataset_end = '2024-09-06'
 dataset_future = '2075-12-31'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 
@@ -35,8 +34,13 @@ else:
     # For production...
     background_callback_manager = CeleryManager(celery_app)
 
-app = Dash(__name__, background_callback_manager=background_callback_manager)
+app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager)
 server = app.server  # expose server variable for Procfile
+app.setup_shortcuts(
+    logo=app.get_asset_url('OSMC_logo.png'),
+    title="Summary Information for the Historical OSMC", # Default: app.title
+    size="normal" # Can also be "slim"
+)
 
 redis_instance = redis.StrictRedis.from_url(os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
 df, total = db.get_summary(dataset_start, '2020-01-31')
@@ -55,8 +59,8 @@ for platform in sorted(platforms):
     platform_options.append({'label': platform, 'value': platform})
 
 parameter_options = []
-# Iterate all long names dictionary sort by value (the long name)
 
+# Iterate all long names dictionary sort by value (the long name)
 for key, value in sorted(constants.long_names.items(), key=lambda x: x[1].lower()):
     if key in constants.data_variables:
         parameter_options.append({'label': constants.long_names[key], 'value': key})
@@ -88,180 +92,145 @@ app.layout = ddk.App([
     dcc.Store('data-change'),
     dcc.Store('platform-data'),
     dcc.Store('week-data'),
-    ddk.Header([
-        ddk.Logo(src=app.get_asset_url('OSMC_logo.png')),
-        ddk.Title('Summary Information for the Historical OSMC'),
-    ]),
-    dmc.Tabs(
-    [
-        dmc.TabsList(
-            [
-                dmc.Tab("Summary Map", value="summary"),
-                dmc.Tab('Observations per Week', 'byweek'),
-                dmc.Tab("Individual Platforms", value="platform"),
-            ]
-        ),
-          dmc.TabsPanel(value='summary', children = [
-            dmc.Grid(children=[
-                dmc.Col(span=3, children=[
-                    dmc.Card([
-                        dmc.Text('Summary Controls', p=12, fz=28),
-                        dmc.Text('Platforms:', p=8, fz=20),
-                        dmc.MultiSelect(
-                            id='platform-dropdown',
-                            data=platform_options,
-                            dropdownPosition='bottom',
-                            clearable=False,
-                            value=['VOSCLIM']
-                        ),
-                        dmc.Text('Date Range:', p=8, fz=20),
-                        dmc.Group(position='apart', children=[
-                            dcc.Input(id='start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
-                            dmc.Button(id='update', children='Update', radius="md", variant='outline'),
-                            dcc.Input(id='end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
-                        ]),
-                        dmc.Group(position='center', children=[
-                            dcc.Loading(html.Div(id='loader', style={'display': 'none'}))
-                        ], mt=30)
-                    ], style={'height': '72vh'}),    
+    dcc.Tabs([
+        dcc.Tab(label='Summary Map', children = [
+            ddk.ControlCard(width=.25, children=[
+                ddk.CardHeader(title='Summary Map Controls'),
+                ddk.ControlItem(label="Platform Type", children=[
+                    dcc.Dropdown(
+                        id='platform-dropdown',
+                        options=platform_options,
+                        multi=True,
+                        clearable=False,
+                        value=['VOSCLIM']
+                    ),
                 ]),
-                dmc.Col(span=9, children=[
-                    dmc.Card(id='one-graph-card', children=[
-                        dmc.CardSection(children=[
-                            dmc.Text(id='graph-title', children='', p=12, fz=28)
-                        ]),
-                        dmc.CardSection(children=[
-                            dcc.Loading(dcc.Graph(
-                                id='update-graph', 
-                                style={'height': '65vh'},
-                                figure=get_blank('Select the date range of interest and click the "Update" button.'))
-                            ),
-                        ])
-                    ])
+                ddk.ControlCard(orientation='horizontal', children=[
+                    ddk.CardHeader('Time Range'),
+                    ddk.ControlItem(children=[
+                        dcc.Input(id='start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
+                    ]),
+                    ddk.ControlItem(children=[
+                        dcc.Input(id='end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
+                    ]),
+                    ddk.ControlItem(children=[
+                        html.Button(id='update', children='Update', style={'margin-left': '35%', 'margin-right': '20%'}),
+                    ],),
+                ]),
+                ddk.ControlItem(children=[
+                    dcc.Loading(html.Div(id='loader', style={'display': 'none'}))
                 ])
             ]),
-        ]),
-          dmc.TabsPanel(value='byweek', children = [
-            dmc.Grid(children=[
-                dmc.Col(span=3, children=[
-                    dmc.Card([
-                        dmc.Text('Percentage of Weeks with', p=12, fz=28),
-                        dmc.Text('At least', p=8, fz=20),
-                        dmc.TextInput(id='min-obs', placeholder='Enter minimum observations', type='number'),
-                        dmc.Text('observations of', p=8, fz=20),
-                        dmc.Select(
-                            id='week-parameter',
-                            data=parameter_options,
-                            value='sst',
-                            dropdownPosition='bottom',
-                            searchable=True,
-                            nothingFound="No variable matches this search.",
-                            clearable=False,
-                        ),
-                        dmc.Text('in each', p=8, fz=20),
-                        dmc.Select(id='gridsize',
-                                   data=[
-                                       {'label': '5\u00B0 x 5\u00B0 Grid Cell', 'value': 5}
-                                   ], value=5),
-                        dmc.Text('for date range:', p=8, fz=20),
-                        dmc.Group(position='apart', children=[
-                            dcc.Input(id='week-start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
-                            dmc.Button(id='week-update', children='Update', radius="md", variant='outline'),
-                            dcc.Input(id='week-end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
-                        ]),
-                        dmc.Group(position='center', children=[
-                            dcc.Loading(html.Div(id='bigq-loader', style={'display': 'none'}))                         
-                        ], mt=30)
-                    ], style={'height': '72vh'}),    
+            ddk.Card(width=.75, id='one-graph-card', children=[
+                ddk.CardHeader(id='graph-title', children='I am the graph title'),
+                dcc.Loading(dcc.Graph(
+                    id='update-graph', 
+                    style={'height': '65vh'},
+                    figure=get_blank('Select the date range of interest and click the "Update" button.')
+                )),
+            ]),    
+        ]),  # summary map tab
+        dcc.Tab(label='Observations per Week', children=[
+            ddk.ControlCard(width='.25', children=[
+                ddk.CardHeader(title='Percentage of weeks with:'),
+                ddk.ControlItem(label='this number of observations:', children=[
+                    dcc.Input(id='min-obs', placeholder='Enter minimum observations', type='number'),
                 ]),
-                dmc.Col(span=9, children=[
-                    dmc.Card(id='percent-map-card', children=[
-                        dmc.CardSection([
-                            dmc.Group(children=[
-                                dmc.Text('as observed by platform: ', ml=15),
-                                dmc.MultiSelect(
-                                    style={'width': 400},
-                                    searchable=True,
-                                    # styles={"dropdown": {"z-index": 1400, "background-color": "pink"}},
-                                    id='week-platform',
-                                    data=platform_options,
-                                    dropdownPosition='bottom',
-                                    clearable=False,
-                                    value=['VOSCLIM']
-                                ),
-                            ])
-                        ]),
-                        dmc.CardSection(children=[
-                            dmc.Text(id='percent-map-title', children='', p=12, fz=28)
-                        ]),
-                        dmc.CardSection(children=[
-                            dcc.Loading(dcc.Graph(
-                                id='percent-map', 
-                                style={'height': '65vh'},
-                                figure=get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'))
-                            ),
-                        ])
-                    ], )
+                ddk.ControlItem(label='for this parameter:', children=[
+                    dcc.Dropdown(
+                        id='week-parameter',
+                        options=parameter_options,
+                        value='sst',
+                        searchable=True,
+                        clearable=False,
+                    ),
+                ]),
+                ddk.ControlItem(label='as observed by this platform:', children=[
+                    dcc.Dropdown(
+                        searchable=True,
+                        id='week-platform',
+                        options=platform_options,
+                        clearable=True,
+                        multi=True,
+                        value=['VOSCLIM']
+                    ),
+                ]),
+                ddk.ControlItem(label='in each grid cell of this size:', children=[
+                    dcc.Dropdown(id='gridsize', options=[{'label': '5\u00B0 x 5\u00B0 Grid Cell', 'value': 5}], value=5),
+                ]),
+                ddk.ControlCard(orientation='horizontal', children=[
+                    ddk.CardHeader(title='for this date range:'),
+                    ddk.ControlItem(children=[
+                        dcc.Input(id='week-start-date-picker', type="date", min=dataset_start, max=dataset_end, value=dataset_start),
+                    ]),
+                    ddk.ControlItem(children=[
+                        dcc.Input(id='week-end-date-picker', type='date', min=dataset_start, max=dataset_end, value='2020-01-31')
+                    ]),
+                    ddk.ControlItem(children=[
+                        html.Button(id='week-update', children='Update', style={'margin-left': '35%', 'margin-right': '20%'}),
+                    ]),
+                ]),
+                ddk.ControlItem(children=[
+                    dcc.Loading(html.Div(id='bigq-loader', style={'display': 'none'}))
                 ])
             ]),
+            ddk.Card(width=.75, children=[
+            ddk.CardHeader(id='percent-map-title'),
+                dcc.Loading(dcc.Graph(
+                    id='percent-map', 
+                    style={'height': '65vh'},
+                    figure=get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'))
+                ),        
+            ]),
         ]),
-        dmc.TabsPanel(value='platform', children=[
-            dmc.Grid(children=[
-                dmc.Col(span=3, children=[
-                    dmc.Card([
-                        dmc.Text('Platform Selection', p=12, fz=28),
-                        dmc.Text('Platforms:', p=8, fz=20),
-                        dmc.MultiSelect(
-                            id='platform-code',
-                            data=code_options,
-                            dropdownPosition='bottom',
-                            searchable=True,
-                            nothingFound="No platform matches this search.",
-                            clearable=False,
-                        ),
-                        dmc.Text('Data Plot Selection', p=12, fz=28),
-                        dmc.Text('Parameter:', p=8, fz=20),
-                        dmc.Select(
-                            id='parameter',
-                            data=parameter_options,
-                            value='sst',
-                            dropdownPosition='bottom',
-                            searchable=True,
-                            nothingFound="No variable matches this search.",
-                            clearable=False,
-                        ),
-                    ], style={'height': '72vh'}),
+        dcc.Tab(label='Individual Platforms', children=[
+            ddk.ControlCard(width=.25, children=[
+                ddk.ControlItem(label='Select platform:', children=[
+                    dcc.Dropdown(
+                        id='platform-code',
+                        options=code_options,
+                        multi=True,
+                        searchable=True,
+                        clearable=True,
+                    ),
                 ]),
-                dmc.Col(span=9, children=[
-                    dmc.Grid(children=[
-                        dmc.Col(span=6, children=[
-                            dcc.Loading(dcc.Graph(
-                                    id='platform-summary-map',
-                                    figure=get_blank('Type in or select a WMO ID for the desired platform.')
-                                )
-                            )
-                        ]),
-                        dmc.Col(span=6, children=[
-                            dcc.Loading(dcc.Graph(
-                                    id='platform-summary-bar',
-                                    figure=get_blank('')
-                                )
-                            )
-                        ]),
-                        dmc.Col(span=12, children=[
-                            dcc.Loading(dcc.Graph(
-                                    id='data-plot',
-                                    figure=get_blank('')
-                                )
-                            )
-                        ])
-                    ])
-                ])
+                ddk.ControlItem(label='Select parameter:', children=[
+                    dcc.Dropdown(
+                        id='parameter',
+                        options=parameter_options,
+                        value='sst',
+                        searchable=True,
+                        clearable=True,
+                    ),
+                ]),
+            ]),
+            ddk.Block(width=.75, children=[
+                ddk.Card(width=.5, children=[
+                    dcc.Loading(dcc.Graph(
+                            id='platform-summary-map',
+                            figure=get_blank('Type in or select a WMO ID for the desired platform.')
+                        )
+                    )
+                ]),
+                ddk.Card(width=.5, children=[
+                    dcc.Loading(dcc.Graph(
+                            id='platform-summary-bar',
+                            figure=get_blank('')
+                        )
+                    )
+                ]),
+                ddk.Card(width=1, children=[
+                    dcc.Loading(dcc.Graph(
+                            id='data-plot',
+                            figure=get_blank('')
+                        )
+                    )
+                ])      
             ])
+            
         ])
-    ], value='summary'),        
-  
-])
+    ]) # All Tabs
+]) # App
 
 
 @app.callback(
@@ -276,7 +245,10 @@ def update_platform_data(in_platform_code):
     if in_platform_code is None or len(in_platform_code) == 0:
         return no_update
     else:
-        df = db.get_platform_data(dataset_start, dataset_future, in_platform_code)
+        df = db.get_platform_data(in_platform_code)
+        if df is None:
+            print('get_platform_data returned None for', in_platform_code)
+            return no_update
         redis_instance.hset("cache", "platform_data", json.dumps(df.to_json()))
         return ['data']
 
@@ -312,8 +284,11 @@ def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_v
     else:
         sunday2 = d2
 
-    if min_nobs is None or not min_nobs.isdigit():
+    
+    if min_nobs is None:
         return exceptions.PreventUpdate
+    else:
+        min_nobs = int(min_nobs)
     df = db.counts_by_week(sunday1.strftime('%Y-%m-%d'), sunday2.strftime('%Y-%m-%d'), in_week_var)
     redis_instance.hset("cache", "week_data", json.dumps(df.to_json()))
     return ['data', '']
@@ -337,8 +312,10 @@ def week_update_data(week_click, min_nobs, in_week_start, in_week_end, in_week_v
 )
 def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
 
-    if in_min_nobs is None or len(in_min_nobs) == 0:
+    if in_min_nobs is None:
         return [get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'), '']
+    else:
+        in_min_nobs = int(in_min_nobs)
 
     df = pd.read_json(json.loads(redis_instance.hget("cache", "week_data")))
     
@@ -405,7 +382,9 @@ def update_bar_chart(data_trigger):
     parameter_opts = []
     for var in params:
         parameter_opts.append({'label': constants.long_names[var], 'value': var})
-    figure = px.bar(df, x='parameter', y='count', color='platform_code', barmode='group')
+    ordered_codes = list(df['platform_code'].unique())
+    ordered_codes.sort()
+    figure = px.bar(df, x='parameter', y='count', color='platform_code', barmode='group', category_orders={'platform_code': ordered_codes})
     return [figure, parameter_options, params[0]]   
 
 
@@ -420,23 +399,25 @@ def update_bar_chart(data_trigger):
 )
 def update_data_plot(data_trigger, in_parameter):
     df = pd.read_json(json.loads(redis_instance.hget("cache", "platform_data")))
-    df['time'] = pd.to_datetime(df['time'], unit='ms')
-    df = df.sort_values(['time', 'platform_code'])
+    df['observation_date'] = pd.to_datetime(df['observation_date'], unit='ms')
+    df = df.sort_values(['observation_date', 'platform_code'])
     if in_parameter == 'ztmp' or in_parameter == 'zsal':
         color_choice = 'Viridis'
         if in_parameter == 'ztmp':
             color_choice = 'Inferno'
-        figure = px.scatter(df, y='observation_depth', x='time', color=in_parameter, color_continuous_scale=color_choice, 
-                            hover_data=['platform_code', 'longitude', 'latitude', 'observation_depth', 'time', in_parameter])
+        figure = px.scatter(df, y='observation_depth', x='observation_date', color=in_parameter, color_continuous_scale=color_choice, 
+                            hover_data=['platform_code', 'longitude', 'latitude', 'observation_depth', 'observation_date', in_parameter])
         figure.update_yaxes(autorange='reversed')
     else:        
         figure = go.Figure()
-        for idx, code in enumerate(df['platform_code'].unique()):
+        codes = list(df['platform_code'].unique())
+        codes.sort()
+        for idx, code in enumerate(codes):
             pdf = df.loc[df['platform_code']==code]
-            trace = px.scatter(pdf, x='time', y=in_parameter,)
+            trace = px.scatter(pdf, x='observation_date', y=in_parameter,)
             trace.update_traces(marker=dict(color=plotly.colors.qualitative.Dark24[idx]), name=str(code), showlegend=True)
             figure.add_traces(list(trace.select_traces()))
-        figure.update_traces(mode='lines')
+        # figure.update_traces(mode='lines')
         figure.update_layout(showlegend=True, title=constants.long_names[in_parameter], margin={'t':60, 'r':40})
     return [figure]   
 
@@ -521,7 +502,7 @@ def update_graph(platform_type, data_change, in_start_date, in_end_date):
     [
         Output('data-change', 'data'),
         Output('loader', 'children', allow_duplicate=True),
-        Output('platform-dropdown', 'data'),
+        Output('platform-dropdown', 'options'),
         Output('platform-dropdown', 'value')
     ],
     [

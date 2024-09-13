@@ -1,0 +1,247 @@
+[
+  {
+    "name": "platform_id",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Internal OSMC platform ID",
+    "fields": []
+  },
+  {
+    "name": "platform_code",
+    "mode": "NULLABLE",
+    "type": "STRING",
+    "description": "WMO id or Ship call sign",
+    "fields": []
+  },
+  {
+    "name": "platform_type",
+    "mode": "NULLABLE",
+    "type": "STRING",
+    "description": "Platform Type",
+    "fields": []
+  },
+  {
+    "name": "country",
+    "mode": "NULLABLE",
+    "type": "STRING",
+    "description": "Country",
+    "fields": []
+  },
+  {
+    "name": "observation_date",
+    "mode": "NULLABLE",
+    "type": "TIMESTAMP",
+    "description": "Observation Time",
+    "fields": []
+  },
+  {
+    "name": "observation_depth",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Observation Depth",
+    "fields": []
+  },
+  {
+    "name": "sst",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Surface Temperature",
+    "fields": []
+  },
+  {
+    "name": "atmp",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Air Temperature",
+    "fields": []
+  },
+  {
+    "name": "precip",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Precipitation",
+    "fields": []
+  },
+  {
+    "name": "ztmp",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Profile Water Temperature",
+    "fields": []
+  },
+  {
+    "name": "zsal",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Profile Salinity",
+    "fields": []
+  },
+  {
+    "name": "sss",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Surface Salinity",
+    "fields": []
+  },
+  {
+    "name": "slp",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Level Pressure",
+    "fields": []
+  },
+  {
+    "name": "windspd",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Wind Speed",
+    "fields": []
+  },
+  {
+    "name": "winddir",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Wind from Direction",
+    "fields": []
+  },
+  {
+    "name": "wvht",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Surface Wave Significant Height",
+    "fields": []
+  },
+  {
+    "name": "waterlevel",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Level",
+    "fields": []
+  },
+  {
+    "name": "clouds",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Cloud Cover",
+    "fields": []
+  },
+  {
+    "name": "dewpoint",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Dew Point Temperature",
+    "fields": []
+  },
+  {
+    "name": "eastward_sea_water_velocity",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Eastward Sea Water Velocity",
+    "fields": []
+  },
+  {
+    "name": "northward_sea_water_velocity",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Northward Sea Water Velocity",
+    "fields": []
+  },
+  {
+    "name": "upward_sea_water_velocity",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Upward Sea Water Velocity",
+    "fields": []
+  },
+  {
+    "name": "rainfall_rate",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Rainfall Rate",
+    "fields": []
+  },
+  {
+    "name": "relative_humidity",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Relative Humidity",
+    "fields": []
+  },
+  {
+    "name": "sea_water_elec_conductivity",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Water Electric Conductivity",
+    "fields": []
+  },
+  {
+    "name": "sea_water_pressure",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Sea Water Pressure",
+    "fields": []
+  },
+  {
+    "name": "sf_dnwelling_lngwv_flux_in_air",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Surface Downwelling Longwave Flux in Air",
+    "fields": []
+  },
+  {
+    "name": "sf_dnwelling_shtwv_flux_in_air",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Surface Downwelling Shortwave Flux in Air",
+    "fields": []
+  },
+  {
+    "name": "waterlevel_met_res",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Meteorological Residual Tidal Elevation",
+    "fields": []
+  },
+  {
+    "name": "waterlevel_wrt_lcd",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Tidal Elevation WRT Local Chart Datum",
+    "fields": []
+  },
+  {
+    "name": "water_col_ht",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Water Column Height",
+    "fields": []
+  },
+  {
+    "name": "wind_to_direction",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Wind to Direction",
+    "fields": []
+  },
+  {
+    "name": "longitude",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Longitude",
+    "fields": []
+  },
+  {
+    "name": "longitude360",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Longitude 0 to 360",
+    "fields": []
+  },
+  {
+    "name": "latitude",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Latitude",
+    "fields": []
+  }
+]

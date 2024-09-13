@@ -1,5 +1,6 @@
 celery
 dash-design-kit
+dash-enterprise-libraries
 dash
 gunicorn
 pandas>=1.5
@@ -11,5 +12,4 @@ cryptography
 diskcache
 psutil
 multiprocess
-dash_mantine_components==0.12.1
 dash-ag-grid
