@@ -34,7 +34,7 @@ else:
     # For production...
     background_callback_manager = CeleryManager(celery_app)
 
-app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager)
+app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager, )
 server = app.server  # expose server variable for Procfile
 app.setup_shortcuts(
     logo=app.get_asset_url('OSMC_logo.png'),
@@ -88,7 +88,7 @@ def get_blank(message):
         ]
     )
     return blank_graph
-app.layout = ddk.App([
+app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
     dcc.Store('data-change'),
     dcc.Store('platform-data'),
     dcc.Store('week-data'),
@@ -122,7 +122,7 @@ app.layout = ddk.App([
                 ])
             ]),
             ddk.Card(width=.75, id='one-graph-card', children=[
-                ddk.CardHeader(id='graph-title', children='I am the graph title'),
+                ddk.CardHeader(id='graph-title', children=''),
                 dcc.Loading(dcc.Graph(
                     id='update-graph', 
                     style={'height': '65vh'},
