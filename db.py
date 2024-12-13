@@ -1,11 +1,7 @@
-from redis import client
-import constants
 import pandas as pd
-import datetime
 import numpy as np
 from google.cloud import bigquery
 import os
-import json
 
 import time
 from cryptography.fernet import Fernet
@@ -20,6 +16,49 @@ if not os.path.isfile('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json'):
 
     with open('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json', 'w') as json_file:
         json_file.write(secret_json.decode())
+
+def get_storm_track(sid):
+    client = bigquery.Client()
+    storm_query = f'''
+        SELECT 
+            *  
+        FROM 
+            `aw-8a5d408d-02e1-4907-9163-b4d.IBTRACS.storms`
+        WHERE
+            SID="{sid}"
+        ORDER BY 
+            ISO_TIME
+    '''
+    try: 
+        df = client.query(storm_query).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return pd.DataFrame()
+
+
+
+
+def get_storms_by_year(year):
+    client = bigquery.Client()
+    storm_query = f'''
+        SELECT 
+            min(ISO_TIME) as MIN_ISO_TIME, max(ISO_TIME) as MAX_ISO_TIME, NAME, SID  
+        FROM 
+            `aw-8a5d408d-02e1-4907-9163-b4d.IBTRACS.storms`
+        WHERE
+            ISO_TIME>="{year}-01-01" and ISO_TIME<="{year}-12-31"
+        GROUP BY
+            SID, NAME 
+        ORDER BY 
+            MIN_ISO_TIME,NAME,SID
+    '''
+    try: 
+        df = client.query(storm_query).to_dataframe()
+        return df
+    except Exception as e:
+        print(e)
+        return pd.DataFrame()
 
 def get_platforms(p_start_time, p_end_time):
     # See get_platform_data
@@ -39,7 +78,32 @@ def get_platforms(p_start_time, p_end_time):
         return df
     except Exception as e:
         print(e)
-        return None
+        return pd.DataFrame()
+
+
+def get_platform_locations(p_start_time, p_end_time):
+    client = bigquery.Client()
+    location_query = f'''
+        SELECT *, r.maxtime
+        FROM (
+            SELECT platform_code, MAX(observation_date) as maxtime
+            FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations`            
+            GROUP BY platform_code
+        ) r
+        INNER JOIN `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` t
+        ON t.platform_code = r.platform_code AND t.observation_date = r.maxtime AND observation_date>='{p_start_time}' and observation_date<='{p_end_time}'
+    '''
+    try: 
+        df = client.query(location_query).to_dataframe()
+        # Get the last entry for variables with multiple depths (couldn't quite figure it out with sql)
+        df = df.groupby('platform_code', as_index=False).last()
+        return df
+    except Exception as e:
+        print(e)
+        return pd.DataFrame()
+
+
+
 
 def get_platform_data(in_platform_code):
 
@@ -161,17 +225,19 @@ def get_data_from_bq(platform, time0, time1):
     client = bigquery.Client()
     try:
         t0 = time.time()
-        sql = 'SELECT * FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` WHERE platform_code="' + platform + '" AND observation_date>="' + time0 + '" AND observastion_date<"' + time1 +'" ORDER BY `observation_date`'
+        sql = 'SELECT * FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` WHERE platform_code="' + platform + '" AND observation_date>="' + time0 + '" AND observation_date<"' + time1 +'" ORDER BY `observation_date`'
         df = client.query(sql).to_dataframe()
         t1 = time.time()
-        df.loc[:,'millis'] = pd.to_datetime(df['observation_date']).view(np.int64)
+        df.loc[:,'millis'] = pd.to_datetime(df['observation_date']).astype(np.int64)
         df.loc[:,'text_time'] = df['observation_date'].astype(str)
         df.loc[:,'trace_text'] = df['text_time'] + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
         t2 = time.time()
         # print ("Read to DataFrame: %.4f | Add columns: %.4f | Rows %d " % (t1-t0, t2-t1, df.shape[0]))
+        return df
     except Exception as e:
         print(e)
-    return df
+        return None
+    
 
 
 def get_platform_info(platform):

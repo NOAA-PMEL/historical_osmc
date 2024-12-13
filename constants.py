@@ -21,6 +21,15 @@ meta_variables = ['latitude', 'longitude', 'observation_date', 'observation_dept
 
 data_variables = [x for x in all_variables if (x not in meta_variables)]
 
+# Surface variables
+surface_variables = data_variables.copy()
+surface_variables.remove('zsal')
+surface_variables.remove('ztmp')
+
+# Depth variables
+
+depth_variables = ['ztmp', 'zsal']
+
 theme = {
     "accent":"#1f78b4",
     "accent_positive":"#017500",

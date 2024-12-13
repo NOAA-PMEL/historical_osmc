@@ -1,3 +1,4 @@
+from math import ceil
 from dash import dcc, html, Input, Output, State, no_update, DiskcacheManager, CeleryManager, exceptions
 from dash_enterprise_libraries import EnterpriseDash
 import plotly
@@ -5,6 +6,7 @@ import dash_design_kit as ddk
 import dash_ag_grid as dag
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
 import redis
 import os
@@ -12,6 +14,7 @@ import json
 import db
 import numpy as np
 import datetime
+from io import StringIO
 
 import constants
 
@@ -19,10 +22,89 @@ import diskcache
 
 from celery import Celery
 
+import colorcet as cc
+
 dataset_start = '2020-01-01'
 dataset_end = '2024-09-06'
 dataset_future = '2075-12-31'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
+map_height = 520
+center = {'lon': 0.0, 'lat': 0.0}
+zoom = 1.4
+marker_size = 9
+trace_size = 12
+row_height = 450
+
+def cc_color_set(index, palette):
+    rgb = px.colors.convert_to_RGB_255(palette[index])
+    hexi = '#%02x%02x%02x' % rgb
+    return hexi
+
+platform_color = {
+    'ARGO' : cc_color_set(0, cc.glasbey_bw_minc_20),
+    'TAGGED ANIMAL': cc_color_set(1, cc.glasbey_bw_minc_20),
+    'C-MAN WEATHER STATIONS': cc_color_set(2, cc.glasbey_bw_minc_20), 
+    'CLIMATE REFERENCE MOORED BUOYS': cc_color_set(3, cc.glasbey_bw_minc_20), 
+    'DRIFTING BUOYS (GENERIC)': cc_color_set(4, cc.glasbey_bw_minc_20),
+    'DRIFTING BUOYS': cc_color_set(4, cc.glasbey_bw_minc_20), 
+    'PROFILING FLOATS AND GLIDERS': cc_color_set(5, cc.glasbey_bw_minc_20),
+    'PROFILING FLOATS AND GLIDERS (GENERIC)': cc_color_set(5, cc.glasbey_bw_minc_20),
+    'GLIDERS': cc_color_set(5, cc.glasbey_bw_minc_20), 
+    'ICE BUOYS': cc_color_set(6, cc.glasbey_bw_minc_20),
+    'MOORED BUOYS (GENERIC)': cc_color_set(7, cc.glasbey_bw_minc_20),
+    'MOORED BUOYS': cc_color_set(7, cc.glasbey_bw_minc_20),
+    'RESEARCH': cc_color_set(8, cc.glasbey_bw_minc_20),
+    'SHIPS (GENERIC)': cc_color_set(9, cc.glasbey_bw_minc_20),
+    'SHIPS': cc_color_set(9, cc.glasbey_bw_minc_20),
+    'SHORE AND BOTTOM STATIONS (GENERIC)': cc_color_set(10, cc.glasbey_bw_minc_20),
+    'TIDE GAUGE STATIONS (GENERIC)': cc_color_set(11, cc.glasbey_bw_minc_20),
+    'TROPICAL MOORED BUOYS': cc_color_set(12, cc.glasbey_bw_minc_20),
+    'TSUNAMI WARNING STATIONS': cc_color_set(21, cc.glasbey_bw_minc_20),
+    'UNKNOWN': cc_color_set(14, cc.glasbey_bw_minc_20),
+    'UNCREWED SURFACE VEHICLE': cc_color_set(15, cc.glasbey_bw_minc_20),
+    'VOLUNTEER OBSERVING SHIPS (GENERIC)': cc_color_set(16, cc.glasbey_bw_minc_20),
+    'VOLUNTEER OBSERVING SHIPS': cc_color_set(16, cc.glasbey_bw_minc_20),
+    'VOSCLIM': cc_color_set(17, cc.glasbey_bw_minc_20),
+    'WEATHER AND OCEAN OBS': cc_color_set(18, cc.glasbey_bw_minc_20),
+    'WEATHER BUOYS': cc_color_set(19, cc.glasbey_bw_minc_20),
+    'WEATHER OBS': cc_color_set(20, cc.glasbey_bw_minc_20),
+    'UNDERWAY CARBON SHIPS (GENERIC)': '#0d3b66',
+    'OCEAN TRANSPORT STATIONS (GENERIC)': '#faf0ca',
+    'GLOSS': '#f4d35e'
+}
+
+platforms = [
+    'WEATHER AND OCEAN OBS',
+    'SHIPS',
+    'ICE BUOYS',
+    'DRIFTING BUOYS (GENERIC)',
+    'RESEARCH',
+    'GLIDERS',
+    'SHORE AND BOTTOM STATIONS (GENERIC)',
+    'UNDERWAY CARBON SHIPS (GENERIC)',
+    'VOLUNTEER OBSERVING SHIPS',
+    'TROPICAL MOORED BUOYS',
+    'VOLUNTEER OBSERVING SHIPS (GENERIC)',
+    'MOORED BUOYS (GENERIC)',
+    'TSUNAMI WARNING STATIONS',
+    'PROFILING FLOATS AND GLIDERS',
+    'SHIPS (GENERIC)',
+    'MOORED BUOYS',
+    'WEATHER BUOYS',
+    'OCEAN TRANSPORT STATIONS (GENERIC)',
+    'CLIMATE REFERENCE MOORED BUOYS',
+    'GLOSS',
+    'VOSCLIM',
+    'UNKNOWN',
+    'WEATHER OBS',
+    'UNCREWED SURFACE VEHICLE',
+    'C-MAN WEATHER STATIONS',
+    'PROFILING FLOATS AND GLIDERS (GENERIC)',
+    'TAGGED ANIMAL',
+    'DRIFTING BUOYS',
+    'TIDE GAUGE STATIONS (GENERIC)'
+]
+
 
 celery_app = Celery(broker=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"), backend=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
 if os.environ.get("DASH_ENTERPRISE_ENV") == "WORKSPACE":
@@ -71,6 +153,7 @@ def get_blank(message):
     blank_graph.add_trace(go.Scatter(x=[0, 1], y=[0, 1], showlegend=False))
     blank_graph.update_traces(visible=False)
     blank_graph.update_layout(
+        height=map_height,
         xaxis={"visible": False},
         yaxis={"visible": False},
         title=message,
@@ -92,6 +175,7 @@ app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
     dcc.Store('data-change'),
     dcc.Store('platform-data'),
     dcc.Store('week-data'),
+    dcc.Store('current-platform'),
     dcc.Tabs([
         dcc.Tab(label='Summary Map', children = [
             ddk.ControlCard(width=.25, children=[
@@ -226,11 +310,293 @@ app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
                         )
                     )
                 ])      
+            ])           
+        ]),
+        dcc.Tab(label='Observing State by Storm', children = [
+            ddk.ControlCard(width=.25, children=[
+                ddk.ControlItem(label='Select a Year:', children=[
+                    dcc.Dropdown(
+                        id='storm-year',
+                        multi=False,
+                        searchable=True,
+                        clearable=True,
+                        options={
+                            "2020": "2020",
+                            "2021": "2021",
+                            "2022": "2022",
+                            "2023": "2023",
+                            "2024": "2024"
+                        }
+                    ),
+                ]),
+                ddk.ControlItem(label='Select a Storm:', children=[
+                    dcc.Dropdown(
+                        id='storm',
+                        multi=False,
+                        searchable=True,
+                        clearable=True,
+                    ),
+                ]),
+                ddk.ControlItem(label='Storm Marker Size by:', children=[
+                    dcc.RadioItems(id='marker-size', options=[
+                        {'label': 'Wind Speed (knots)','value': 'USA_WIND'},
+                        {'label': 'Minimum Sea Level Pressure (mb)', 'value': "USA_PRES"}
+                    ], value='USA_WIND'),
+                ]),
+                ddk.ControlItem(label='Storm Marker Color by:', children=[
+                    dcc.RadioItems(id='marker-color', options=[
+                        {'label': 'Wind Speed (knots)','value': 'USA_WIND'},
+                        {'label': 'Minimum Sea Level Pressure (mb)', 'value': "USA_PRES"}
+                    ], value='USA_WIND'),
+                ]),
+                html.Div(
+                    dcc.Loading(html.Div(id='map-loader', style={'height':47, 'visibility':'hidden'}))
+                )
+            ]),
+            ddk.Card(width=.75, children=[
+                dcc.Graph(
+                    id='platforms-storms',
+                    figure=get_blank('Choose a storm to view.')
+                )
+            ]),
+            ddk.Card(width=1, children=[
+                dcc.Loading(dcc.Graph(
+                    id='storm-timeseries'
+                ))
+            ]),
+            ddk.Card(width=1, children=[
+                dcc.Loading(dcc.Graph(
+                    id='storm-profiles'
+                ))
             ])
-            
         ])
+        # new tab here
     ]) # All Tabs
 ]) # App
+
+
+@app.callback(
+    [
+        Output('storm', 'options')
+    ],
+    [
+        Input('storm-year', 'value')
+    ]
+)
+def get_storms(year):
+    options = []
+    if year is not None and len(year) > 0:
+        df = db.get_storms_by_year(year)
+        redis_instance.hset("cache", "storm_data", json.dumps(df.to_json()))
+        df['label'] = df['NAME'] + ' (' + df['MIN_ISO_TIME'].str.slice(0, 10) + ', ' + df['MAX_ISO_TIME'].str.slice(0, 10) + ')'
+        df = df[['SID','label']]
+        df.rename(columns={'SID':'value'}, inplace=True)
+        df.set_index('value')
+        options = df.to_dict(orient='records')
+        return [options]
+    else:
+        return no_update
+
+
+@app.callback(
+    [
+        Output('platforms-storms','figure'),
+        Output('map-loader', 'children')
+    ],
+    [
+        Input('storm','value'),
+        Input('marker-color', 'value'),
+        Input('marker-size', 'value'),
+        Input('current-platform', 'data')
+    ], prevent_initial_call=True
+)
+def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platform):
+    df = db.get_storm_track(sid)
+    df = df.loc[df[storm_marker_size].notna()]
+    cmap = px.colors.sequential.Inferno
+    if storm_marker_color == 'USA_PRES':
+        cmap = px.colors.sequential.Inferno_r
+    plot = px.scatter_map(
+               df, 
+               lat='LAT', 
+               lon='LON', 
+               color=storm_marker_color, 
+               size=storm_marker_size, 
+               hover_data=['NAME', 'LAT', 'LON', 'ISO_TIME', 'USA_WIND', 'USA_PRES'],
+               color_continuous_scale=cmap
+            )
+    
+    for i in range(0, df.shape[0] - 1):
+        plot.add_trace(go.Scattermap(mode="lines",
+                                    lon=[df['LON'].iloc[i],df['LON'].iloc[i+1]],
+                                    lat=[df['LAT'].iloc[i],df['LAT'].iloc[i+1]],
+                                    line_color='red', showlegend=False, hoverinfo='skip'))
+    redis_instance.hset('cache', 'storm-start', str(df['ISO_TIME'].min()))
+    redis_instance.hset('cache', 'storm-end', str(df['ISO_TIME'].max()))
+
+    df = db.get_platform_locations(df['ISO_TIME'].min(), df['ISO_TIME'].max())
+    df.loc[:,'trace_text'] = df['observation_date'].astype(str) + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
+
+    for ptype in platforms:  
+        if ptype in platform_color:
+            marker_color = platform_color[ptype]
+        else:
+            marker_color = '#FF69B4'
+        df_plot = df.loc[df['platform_type']==ptype]
+        plot.add_trace(
+            go.Scattermap(
+                mode='markers', 
+                lon=df_plot['longitude'], 
+                lat=df_plot['latitude'],
+                marker=dict(
+                    color=marker_color, 
+                    size=marker_size
+                ), name=str(ptype),
+                hovertext=df_plot['trace_text'],
+                hoverlabel = {'namelength': 0,},
+                customdata=df_plot['platform_code'],
+            )
+        )
+
+    if in_current_platform is not None:
+        # Plot the platform trace
+        trace_df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "storm-platform-data").decode('utf-8'))))
+        platform_trace = go.Scattermap(lat=trace_df["latitude"], lon=trace_df["longitude"], 
+                                    hovertext=trace_df['trace_text'],
+                                    hoverlabel = {'namelength': 0,},
+                                    mode='markers',
+                                    marker=dict(color=trace_df["millis"], colorscale='Greys', size=trace_size), name=str(in_current_platform),
+                                    uid=9000)
+        plot.add_trace(platform_trace)
+
+    plot.update_layout(
+        uirevision=str(sid),
+        height=map_height,
+        map_style="white-bg",
+        map_layers=[
+            {
+                "below": 'traces',
+                "sourcetype": "raster",
+                "sourceattribution": "General Bathymetric Chart of the Oceans (GEBCO); NOAA National Centers for Environmental Information (NCEI)",
+                "source": [
+                   'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}'
+                    
+                ]
+            }
+        ],
+        map_zoom=zoom,
+        map_center=center,
+        map_pitch = 0,
+        map_bearing = 0,
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        legend=dict(
+            orientation="v",
+            x=-.01,
+        ),
+        modebar_orientation='v',
+    )
+    return[plot,'done']
+
+
+@app.callback(
+    [
+        Output('storm-timeseries', 'figure'),
+        Output('storm-profiles', 'figure')
+    ],
+    [
+        Input('current-platform', 'data')
+    ], prevent_initial_call=True
+)
+def plot_timeseries(current_platform):
+    if current_platform is None:
+        return [get_blank('Select a reporting platform from the map.'), get_blank("Click on a reporting platform.")]
+    else:
+        out_platform_code = current_platform
+        # hget data
+        df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "storm-platform-data").decode('utf-8'))))
+        df['platform_code'] = df['platform_code'].astype(str)
+        columns_remaining = df.columns
+        surface_variables = list(set(constants.surface_variables) & set(columns_remaining))
+        depth_variables = list(set(constants.depth_variables) & set(columns_remaining))
+        sub_titles = []
+        rows = ceil(len(surface_variables)/3)
+        row = 1
+        col = 1
+        if df is not None and not df.empty:
+            if len(surface_variables) > 0:
+                for var in surface_variables:
+                    sub_titles.append(constants.long_names[var])
+                row_heights = [row_height]*rows
+                sfigure = make_subplots(cols=3, rows=rows, row_heights=row_heights, subplot_titles=sub_titles, shared_xaxes='all',)
+                for var in surface_variables:
+                    trace = go.Scatter(y=df[var], x=df['observation_date'], name=var, showlegend=False)
+                    sfigure.add_trace(trace, row=row, col=col)
+                    if col == 3:
+                        row = row + 1
+                    col = col%3 + 1
+                this_type = df['platform_type'].loc[df['platform_code']==out_platform_code].iloc[0]
+                sfigure.update_layout(height=rows*row_height, margin={'t':180}, title='Data from '+ str(this_type) + ' ' + str(out_platform_code))
+                for i in range(0, len(surface_variables)):
+                    xax = 'xaxis'
+                    if i > 0:
+                        xax = xax + str(i+1)
+                    sfigure['layout'][xax].update(showticklabels=True)
+            else:
+                sfigure = get_blank('No surface data found.')
+
+            if len(depth_variables) > 0:
+                cbarlocs=[.45, 1.0]
+                dfigure = make_subplots(cols=2, rows=1, row_heights=[row_height], 
+                                        subplot_titles=[constants.long_names[depth_variables[0]], constants.long_names[depth_variables[1]]],
+                                        shared_xaxes='all')
+                for vix, var in enumerate(depth_variables):
+                    colorscale='Inferno'
+                    if var == 'zsal':
+                        colorscale='Viridis'
+                    plot_df = df.dropna(subset=[var])
+                    trace = go.Scatter(y=plot_df['observation_depth'], x=plot_df['observation_date'],
+                                    showlegend=False,
+                                    marker=dict(
+                                        symbol='square', 
+                                        showscale=True, color=plot_df[var], 
+                                        colorscale=colorscale,
+                                        colorbar={'x':cbarlocs[vix], 'title':{'side':'right','text': var,}}
+                                    ),
+                                    mode='markers', name=str(var),)
+                    dfigure.add_trace(trace, row=1, col=vix+1)
+                
+                dfigure['layout']['yaxis']['autorange'] = "reversed"
+                dfigure['layout']['yaxis2']['autorange'] = "reversed"
+                dfigure.update_layout(height=row_height, margin={'t':90})
+            else:
+                dfigure = get_blank("No sub-surface variables found.")
+            return [sfigure, dfigure]
+        else:
+            return [get_blank("No surface data found for this platform."), get_blank("No sub-surface data found for this platform.") ]
+
+
+@app.callback(
+    [
+        Output('current-platform', 'data'),
+    ],
+    [
+        Input('platforms-storms', 'clickData')
+    ], prevent_initial_call=True
+)
+def set_platform_code_from_map(state_in_click):
+    out_platform_code = None
+    if state_in_click is not None:
+        fst_point = state_in_click['points'][0]
+        out_platform_code = fst_point['customdata']
+    # Get and cache the platform data.
+    start_date = redis_instance.hget('cache', 'storm-start').decode('utf-8')
+    end_date = redis_instance.hget('cache', 'storm-end').decode('utf-8')
+    df = db.get_data_from_bq(out_platform_code, start_date, end_date)
+    df.dropna(axis=1, how='all', inplace=True)
+    redis_instance.hset('cache','storm-platform-data', json.dumps(df.to_json()))
+    return [out_platform_code]
+    
+
 
 
 @app.callback(
@@ -471,10 +837,10 @@ def update_graph(platform_type, data_change, in_start_date, in_end_date):
     if len(platform_type) == 0:
         return go.Figure(), 'No platform selected.', 'nothing'
     if 'all' in platform_type:
-        pdf = pd.read_json(json.loads(redis_instance.hget("cache", "totals")))
+        pdf = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "totals").decode('utf-8'))))
         platforms = 'all platforms'
     else:
-        df = pd.read_json(json.loads(redis_instance.hget("cache", "summary")))
+        df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "summary").decode('utf-8'))))
         collection = []
         for platform in platform_type:
             cdf = df.loc[df['platform_type']==platform]
