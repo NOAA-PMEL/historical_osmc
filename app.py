@@ -119,7 +119,7 @@ else:
 app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager, )
 server = app.server  # expose server variable for Procfile
 app.setup_shortcuts(
-    logo=app.get_asset_url('OSMC_logo.png'),
+    # logo=app.get_asset_url('GOMO_Lockup_Outlines-2.svg'),
     title="Summary Information for the Historical OSMC", # Default: app.title
     size="normal" # Can also be "slim"
 )
@@ -371,7 +371,36 @@ app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
             ])
         ])
         # new tab here
-    ]) # All Tabs
+    ]), # All Tabs
+            ddk.PageFooter(children=[                    
+            html.Hr(),
+            ddk.Block(children=[
+                ddk.Block(width=.1),
+                ddk.Block(width=.3, children=[
+                    html.Div(children=[
+                        dcc.Link('National Oceanic and Atmospheric Administration',
+                                href='https://www.noaa.gov/', style={'font-size': '.8em'}),
+                    ]),
+                    html.Div(children=[
+                        dcc.Link('Pacific Marine Environmental Laboratory',
+                                href='https://www.pmel.noaa.gov/',style={'font-size': '.8em'}),
+                    ]),
+                    html.Div(children=[
+                        dcc.Link('oar.pmel.webmaster@noaa.gov', href='mailto:oar.pmel.webmaster@noaa.gov', style={'font-size': '.8em'})
+                    ]),
+                    dcc.Link('DOC |', href='https://www.commerce.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' NOAA |', href='https://www.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' OAR |', href='https://www.research.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' PMEL |', href='https://www.pmel.noaa.gov/', style={'font-size': '.8em'}),
+                    dcc.Link(' Privacy Policy |', href='https://www.noaa.gov/disclaimer', style={'font-size': '.8em'}),
+                    dcc.Link(' Disclaimer |', href='https://www.noaa.gov/disclaimer',style={'font-size': '.8em'}),
+                    dcc.Link(' Accessibility', href='https://www.pmel.noaa.gov/accessibility',style={'font-size': '.8em'})
+                ]),
+                ddk.Block(width=.2,children=[html.Img(src=app.get_asset_url('logo-PMEL-lockup-light_noaaPMEL_horizontal_rgb_2024.png'), style={'height': '90px', 'padding':'14px'})]),
+                ddk.Block(width=.35,children=[html.Img(src=app.get_asset_url('GOMO_Lockup_Outlines-2.svg'), style={'height': '90px', 'padding':'14px'})])
+
+            ])
+        ])
 ]) # App
 
 
@@ -547,7 +576,7 @@ def plot_timeseries(current_platform):
             else:
                 sfigure = get_blank('No surface data found.')
 
-            if len(depth_variables) > 0:
+            if len(depth_variables) > 1:
                 cbarlocs=[.45, 1.0]
                 dfigure = make_subplots(cols=2, rows=1, row_heights=[row_height], 
                                         subplot_titles=[constants.long_names[depth_variables[0]], constants.long_names[depth_variables[1]]],
