@@ -554,14 +554,17 @@ def plot_timeseries(current_platform):
         rows = ceil(len(surface_variables)/3)
         row = 1
         col = 1
+
         if df is not None and not df.empty:
             if len(surface_variables) > 0:
+                df.loc[:,'trace_text'] = df['observation_date'].astype(str) + "<br>" + df['platform_type'] + "<br>" + df['platform_code'] + "<br>" + df['platform_code']
                 for var in surface_variables:
                     sub_titles.append(constants.long_names[var])
                 row_heights = [row_height]*rows
                 sfigure = make_subplots(cols=3, rows=rows, row_heights=row_heights, subplot_titles=sub_titles, shared_xaxes='all',)
                 for var in surface_variables:
-                    trace = go.Scatter(y=df[var], x=df['observation_date'], name=var, showlegend=False)
+                    df.loc[:,'trace_text'] = df['observation_date'].astype(str) + "<br>" + df['platform_type'] + "<br>" + df['platform_code'] + "<br>" + df[var].astype(str)
+                    trace = go.Scatter(y=df[var], x=df['observation_date'], name=var, showlegend=False, text=df['trace_text'], hoverinfo='text')
                     sfigure.add_trace(trace, row=row, col=col)
                     if col == 3:
                         row = row + 1
@@ -586,6 +589,8 @@ def plot_timeseries(current_platform):
                     if var == 'zsal':
                         colorscale='Viridis'
                     plot_df = df.dropna(subset=[var])
+                    plot_df.loc[:,'trace_text'] = plot_df['observation_date'].astype(str) + "<br>" + plot_df['platform_type'] + "<br>" + plot_df['platform_code'] + "<br>" + plot_df[var].astype(str)
+                    this_type = df['platform_type'].loc[df['platform_code']==out_platform_code].iloc[0]
                     trace = go.Scatter(y=plot_df['observation_depth'], x=plot_df['observation_date'],
                                     showlegend=False,
                                     marker=dict(
@@ -594,12 +599,12 @@ def plot_timeseries(current_platform):
                                         colorscale=colorscale,
                                         colorbar={'x':cbarlocs[vix], 'title':{'side':'right','text': var,}}
                                     ),
-                                    mode='markers', name=str(var),)
+                                    mode='markers', name=str(var), hoverinfo='text', text=plot_df['trace_text'])
                     dfigure.add_trace(trace, row=1, col=vix+1)
                 
                 dfigure['layout']['yaxis']['autorange'] = "reversed"
                 dfigure['layout']['yaxis2']['autorange'] = "reversed"
-                dfigure.update_layout(height=row_height, margin={'t':90})
+                dfigure.update_layout(height=row_height, margin={'t':90}, title='Data from '+ str(this_type) + ' ' + str(out_platform_code))
             else:
                 dfigure = get_blank("No sub-surface variables found.")
             return [sfigure, dfigure]
