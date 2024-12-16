@@ -83,15 +83,16 @@ def get_platforms(p_start_time, p_end_time):
 
 def get_platform_locations(p_start_time, p_end_time):
     client = bigquery.Client()
+    # https://stackoverflow.com/questions/19432913/select-info-from-table-where-row-has-max-date
     location_query = f'''
-        SELECT *, r.maxtime
-        FROM (
-            SELECT platform_code, MAX(observation_date) as maxtime
-            FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations`            
-            GROUP BY platform_code
-        ) r
-        INNER JOIN `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` t
-        ON t.platform_code = r.platform_code AND t.observation_date = r.maxtime AND observation_date>='{p_start_time}' and observation_date<='{p_end_time}'
+        SELECT t.platform_code,max_date,*
+            FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` t
+            INNER JOIN 
+            (SELECT platform_code,MAX(observation_date) AS max_date, MIN(observation_depth) AS min_depth
+            FROM `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations`
+            WHERE observation_date>='{p_start_time}' AND observation_date<='{p_end_time}'
+            GROUP BY platform_code) a
+            ON a.platform_code = t.platform_code AND a.min_depth = observation_depth AND a.max_date = observation_date
     '''
     try: 
         df = client.query(location_query).to_dataframe()

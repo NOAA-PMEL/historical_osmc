@@ -437,7 +437,7 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
     df = db.get_platform_locations(df['ISO_TIME'].min(), df['ISO_TIME'].max())
     df.loc[:,'trace_text'] = df['observation_date'].astype(str) + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
 
-    for ptype in platforms:  
+    for ptype in sorted(platforms):  
         if ptype in platform_color:
             marker_color = platform_color[ptype]
         else:
@@ -450,17 +450,19 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
                 lat=df_plot['latitude'],
                 marker=dict(
                     color=marker_color, 
-                    size=marker_size
+                    size=marker_size,
                 ), name=str(ptype),
                 hovertext=df_plot['trace_text'],
                 hoverlabel = {'namelength': 0,},
                 customdata=df_plot['platform_code'],
+                
             )
         )
 
     if in_current_platform is not None:
         # Plot the platform trace
         trace_df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "storm-platform-data").decode('utf-8'))))
+        trace_df['observation_date'] = pd.to_datetime(trace_df['observation_date'], unit='ms')
         platform_trace = go.Scattermap(lat=trace_df["latitude"], lon=trace_df["longitude"], 
                                     hovertext=trace_df['trace_text'],
                                     hoverlabel = {'namelength': 0,},
@@ -515,6 +517,7 @@ def plot_timeseries(current_platform):
         # hget data
         df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "storm-platform-data").decode('utf-8'))))
         df['platform_code'] = df['platform_code'].astype(str)
+        df['observation_date'] = pd.to_datetime(df['observation_date'], unit='ms')
         columns_remaining = df.columns
         surface_variables = list(set(constants.surface_variables) & set(columns_remaining))
         depth_variables = list(set(constants.depth_variables) & set(columns_remaining))

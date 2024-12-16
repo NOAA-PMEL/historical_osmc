@@ -7,6 +7,28 @@ redis_instance = redis.StrictRedis.from_url(
     os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
 )
 
+catgory_order = [
+    'C-MAN WEATHER STATIONS',	
+    'CLIMATE REFERENCE MOORED BUOYS',
+    'DRIFTING BUOYS',
+    'DRIFTING BUOYS (GENERIC)',
+    'GLIDERS',
+    'GLOSS',
+    'ICE BUOYS',
+    'MOORED BUOYS',
+    'MOORED BUOYS (GENERIC)',
+    'OCEAN TRANSPORT STATIONS (GENERIC)',
+    'PROFILING FLOATS AND GLIDERS',
+    'PROFILING FLOATS AND GLIDERS (GENERIC)',
+    'RESEARCH',
+    'SHIPS',
+    'SHIPS (GENERIC)',
+    'SHORE AND BOTTOM STATIONS (GENERIC)',
+    'TAGGED ANIMAL',
+    'TIDE GAUGE STATIONS (GENERIC)',
+    'TROPICAL MOORED BUOYS',
+]
+
 all_variables = []
 long_names = {}
 
