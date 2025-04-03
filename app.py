@@ -1,5 +1,7 @@
 from math import ceil
+from re import A
 from dash import dcc, html, Input, Output, State, no_update, DiskcacheManager, CeleryManager, exceptions
+from dash.dash import PreventUpdate
 from dash_enterprise_libraries import EnterpriseDash
 import plotly
 import dash_design_kit as ddk
@@ -361,12 +363,14 @@ app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
             ]),
             ddk.Card(width=1, children=[
                 dcc.Loading(dcc.Graph(
-                    id='storm-timeseries'
+                    id='storm-timeseries',
+                    figure=get_blank('Choose a storm to view.')
                 ))
             ]),
             ddk.Card(width=1, children=[
                 dcc.Loading(dcc.Graph(
-                    id='storm-profiles'
+                    id='storm-profiles',
+                    figure=get_blank('Choose a storm to view.')
                 ))
             ])
         ])
@@ -406,11 +410,13 @@ app.layout = ddk.App(show_editor=False, theme=constants.theme, children=[
 
 @app.callback(
     [
-        Output('storm', 'options')
+        Output('storm', 'options'),
+        Output('current-platform', 'data', allow_duplicate=True),
+        Output('map-loader','children', allow_duplicate=True)
     ],
     [
         Input('storm-year', 'value')
-    ]
+    ], prevent_initial_call=True
 )
 def get_storms(year):
     options = []
@@ -422,15 +428,15 @@ def get_storms(year):
         df.rename(columns={'SID':'value'}, inplace=True)
         df.set_index('value')
         options = df.to_dict(orient='records')
-        return [options]
+        return [options, None, '']
     else:
-        return no_update
+        return [no_update, None, '']
 
 
 @app.callback(
     [
         Output('platforms-storms','figure'),
-        Output('map-loader', 'children')
+        Output('map-loader', 'children', allow_duplicate=True)
     ],
     [
         Input('storm','value'),
@@ -440,13 +446,19 @@ def get_storms(year):
     ], prevent_initial_call=True
 )
 def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platform):
-    df = db.get_storm_track(sid)
-    df = df.loc[df[storm_marker_size].notna()]
+
+    if sid is None or len(sid) <= 1:
+        raise PreventUpdate 
+
+    sdf = db.get_storm_track(sid)
+    sdf = sdf.loc[sdf[storm_marker_size].notna()]
+    sdf.loc[:,'millis'] = pd.to_datetime(sdf['ISO_TIME']).astype(np.int64)
+    sdf.loc[:,'millis'] =  sdf.loc[:,'millis']/1000
     cmap = px.colors.sequential.Inferno
     if storm_marker_color == 'USA_PRES':
         cmap = px.colors.sequential.Inferno_r
     plot = px.scatter_map(
-               df, 
+               sdf, 
                lat='LAT', 
                lon='LON', 
                color=storm_marker_color, 
@@ -455,15 +467,15 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
                color_continuous_scale=cmap
             )
     
-    for i in range(0, df.shape[0] - 1):
+    for i in range(0, sdf.shape[0] - 1):
         plot.add_trace(go.Scattermap(mode="lines",
-                                    lon=[df['LON'].iloc[i],df['LON'].iloc[i+1]],
-                                    lat=[df['LAT'].iloc[i],df['LAT'].iloc[i+1]],
+                                    lon=[sdf['LON'].iloc[i],sdf['LON'].iloc[i+1]],
+                                    lat=[sdf['LAT'].iloc[i],sdf['LAT'].iloc[i+1]],
                                     line_color='red', showlegend=False, hoverinfo='skip'))
-    redis_instance.hset('cache', 'storm-start', str(df['ISO_TIME'].min()))
-    redis_instance.hset('cache', 'storm-end', str(df['ISO_TIME'].max()))
+    redis_instance.hset('cache', 'storm-start', str(sdf['ISO_TIME'].min()))
+    redis_instance.hset('cache', 'storm-end', str(sdf['ISO_TIME'].max()))
 
-    df = db.get_platform_locations(df['ISO_TIME'].min(), df['ISO_TIME'].max())
+    df = db.get_platform_locations(sdf['ISO_TIME'].min(), sdf['ISO_TIME'].max())
     df.loc[:,'trace_text'] = df['observation_date'].astype(str) + "<br>" + df['platform_type'] + "<br>" + df['country'] + "<br>" + df['platform_code']
 
     for ptype in sorted(platforms):  
@@ -488,7 +500,7 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
             )
         )
 
-    if in_current_platform is not None:
+    if in_current_platform is not None and len(in_current_platform) > 0:
         # Plot the platform trace
         trace_df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "storm-platform-data").decode('utf-8'))))
         trace_df['observation_date'] = pd.to_datetime(trace_df['observation_date'], unit='ms')
@@ -499,6 +511,24 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
                                     marker=dict(color=trace_df["millis"], colorscale='Greys', size=trace_size), name=str(in_current_platform),
                                     uid=9000)
         plot.add_trace(platform_trace)
+
+        # Add colored dots to the storm location that match the color of the platform
+        storm_platform_co_location = sdf.loc[sdf['millis']>=trace_df['millis'].min()]
+        storm_platform_co_location = storm_platform_co_location.loc[storm_platform_co_location['millis']<=trace_df['millis'].max()]
+        storm_platform_co_location.loc[:,'trace_text'] = storm_platform_co_location['ISO_TIME'].astype(str) + "<br>LAT=" + storm_platform_co_location['LAT'].astype(str) + "<br>LON=" + storm_platform_co_location['LON'].astype(str)
+        storm_trace = go.Scattermap(lat=storm_platform_co_location["LAT"], lon=storm_platform_co_location["LON"], 
+                                    hoverlabel = {'namelength': 0,},
+                                    mode='markers',
+                                    hovertext=storm_platform_co_location['trace_text'],
+                                    marker=dict(
+                                        color=storm_platform_co_location["millis"], 
+                                        colorscale='Greys', size=trace_size, 
+                                        cmin=trace_df['millis'].min(),
+                                        cmax=trace_df['millis'].max(),
+                                    ),
+                                    name=str('Storm Location'),
+                                    uid=9000)
+        plot.add_trace(storm_trace)
 
     plot.update_layout(
         uirevision=str(sid),
@@ -614,7 +644,7 @@ def plot_timeseries(current_platform):
 
 @app.callback(
     [
-        Output('current-platform', 'data'),
+        Output('current-platform', 'data', allow_duplicate=True),
     ],
     [
         Input('platforms-storms', 'clickData')
@@ -624,13 +654,15 @@ def set_platform_code_from_map(state_in_click):
     out_platform_code = None
     if state_in_click is not None:
         fst_point = state_in_click['points'][0]
-        out_platform_code = fst_point['customdata']
-    # Get and cache the platform data.
-    start_date = redis_instance.hget('cache', 'storm-start').decode('utf-8')
-    end_date = redis_instance.hget('cache', 'storm-end').decode('utf-8')
-    df = db.get_data_from_bq(out_platform_code, start_date, end_date)
-    df.dropna(axis=1, how='all', inplace=True)
-    redis_instance.hset('cache','storm-platform-data', json.dumps(df.to_json()))
+        if 'customdata' in fst_point:
+            out_platform_code = fst_point['customdata']
+    if out_platform_code is not None:
+        # Get and cache the platform data.
+        start_date = redis_instance.hget('cache', 'storm-start').decode('utf-8')
+        end_date = redis_instance.hget('cache', 'storm-end').decode('utf-8')
+        df = db.get_data_from_bq(out_platform_code, start_date, end_date)
+        df.dropna(axis=1, how='all', inplace=True)
+        redis_instance.hset('cache','storm-platform-data', json.dumps(df.to_json()))
     return [out_platform_code]
     
 
