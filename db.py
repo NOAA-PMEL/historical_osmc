@@ -10,11 +10,12 @@ with open('google.key', 'rb') as file:
     secret = file.read()
 
 if not os.path.isfile('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json'):
-    fernet = Fernet(os.environ.get('GOOGLE_KEY'))
+    key = os.environ.get('GOOGLE_KEY')
+    fernet = Fernet(key)
 
     secret_json = fernet.decrypt(secret)
-
-    with open('aw-8a5d408d-02e1-4907-9163-b4d-ed487f09f36b.json', 'w') as json_file:
+    key_file = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    with open(key_file, 'w') as json_file:
         json_file.write(secret_json.decode())
 
 def get_storm_track(sid):
