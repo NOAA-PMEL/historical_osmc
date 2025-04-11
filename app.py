@@ -538,7 +538,7 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
             {
                 "below": 'traces',
                 "sourcetype": "raster",
-                "sourceattribution": "General Bathymetric Chart of the Oceans (GEBCO); NOAA National Centers for Environmental Information (NCEI)",
+                "sourceattribution": "&nbsp;GEBCO &amp; NCEI&nbsp;",
                 "source": [
                    'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}'
                     
