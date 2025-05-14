@@ -27,7 +27,7 @@ from celery import Celery
 import colorcet as cc
 
 dataset_start = '2020-01-01'
-dataset_end = '2024-09-06'
+dataset_end = '2024-12-31'
 dataset_future = '2075-12-31'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 map_height = 520
@@ -538,7 +538,7 @@ def make_storm_map(sid, storm_marker_color, storm_marker_size, in_current_platfo
             {
                 "below": 'traces',
                 "sourcetype": "raster",
-                "sourceattribution": "General Bathymetric Chart of the Oceans (GEBCO); NOAA National Centers for Environmental Information (NCEI)",
+                "sourceattribution": "&nbsp;GEBCO &amp; NCEI&nbsp;",
                 "source": [
                    'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}'
                     
@@ -751,8 +751,8 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
         return [get_blank('Fill out the form on the left with the minimum number of observations, the parameter, and the date range and click "Update".'), '']
     else:
         in_min_nobs = int(in_min_nobs)
-
-    df = pd.read_json(json.loads(redis_instance.hget("cache", "week_data")))
+    jstr = json.loads(redis_instance.hget("cache", "week_data"))
+    df = pd.read_json(StringIO(jstr))
     
     d1 = datetime.datetime.strptime(week_start, '%Y-%m-%d')
     d2 = datetime.datetime.strptime(week_end, '%Y-%m-%d')
@@ -803,7 +803,8 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
     ], prevent_initial_call=True
 )
 def update_bar_chart(data_trigger):
-    df = pd.read_json(json.loads(redis_instance.hget("cache", "platform_data")))
+    jstr = json.loads(redis_instance.hget("cache", "platform_data"))
+    df = pd.read_json(StringIO(jstr))
     df['platform_code'] = df['platform_code'].astype(str)
     df = df.groupby('platform_code', as_index=False).count()
     df = df[constants.data_variables + ['platform_code']]
@@ -833,7 +834,8 @@ def update_bar_chart(data_trigger):
     ], prevent_initial_call=True
 )
 def update_data_plot(data_trigger, in_parameter):
-    df = pd.read_json(json.loads(redis_instance.hget("cache", "platform_data")))
+    jstr = json.loads(redis_instance.hget("cache", "platform_data"))
+    df = pd.read_json(StringIO(jstr))
     df['observation_date'] = pd.to_datetime(df['observation_date'], unit='ms')
     df = df.sort_values(['observation_date', 'platform_code'])
     if in_parameter == 'ztmp' or in_parameter == 'zsal':
