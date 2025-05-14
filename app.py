@@ -779,7 +779,7 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
 
     # count
     df = df.groupby(['gid', 'latitude', 'longitude', 'cell', 'obsweek', 'obsyear'], as_index=False).sum(['obs'])
-    df = df.loc[df['obs'] > int(in_min_nobs)].groupby(['gid', 'latitude', 'longitude', 'cell'], as_index=False).count()
+    df = df.loc[df['obs'] >= int(in_min_nobs)].groupby(['gid', 'latitude', 'longitude', 'cell'], as_index=False).count()
     
     df['percent'] = (df['obs']/weeks)*100.0
     df['percent'] = df['percent'].astype(int)
