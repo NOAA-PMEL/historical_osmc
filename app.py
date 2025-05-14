@@ -776,11 +776,12 @@ def make_week_map(new_data, in_plat, week_start, week_end, in_min_nobs, in_var):
     # Get specificed platforms
     if 'all' not in in_plat:
         df = df.loc[df['platform_type'].isin(in_plat)]
+
     # count
-    df = df.groupby(['gid', 'latitude', 'longitude', 'cell', 'platform_type', 'week'], as_index=False).sum(['obs'])
-    df = df.loc[df['obs'] > int(in_min_nobs)].groupby(['gid', 'latitude', 'longitude', 'cell', 'platform_type', 'week'], as_index=False).count()
+    df = df.groupby(['gid', 'latitude', 'longitude', 'cell', 'obsweek', 'obsyear'], as_index=False).sum(['obs'])
+    df = df.loc[df['obs'] > int(in_min_nobs)].groupby(['gid', 'latitude', 'longitude', 'cell'], as_index=False).count()
     
-    df['percent'] = (df['week']/weeks)*100.0
+    df['percent'] = (df['obs']/weeks)*100.0
     df['percent'] = df['percent'].astype(int)
 
     title = f'Percent of weeks (from Sunday, {s1f} to Sunday, {s2f}) in each 5\u00B0 x 5\u00B0 cell with at least {in_min_nobs} {in_plat} observations of {in_var}.'
@@ -912,11 +913,7 @@ def update_graph(platform_type, data_change, in_start_date, in_end_date):
         platforms = 'all platforms'
     else:
         df = pd.read_json(StringIO(json.loads(redis_instance.hget("cache", "summary").decode('utf-8'))))
-        collection = []
-        for platform in platform_type:
-            cdf = df.loc[df['platform_type']==platform]
-            collection.append(cdf)
-        pdf = pd.concat(collection)
+        pdf = df.loc[df['platform_type'].isin(platform_type)]
         pdf.groupby(['gid']).sum()
         platforms = ",".join(platform_type)
     # There are no zeros because of the query pdf['mask'] = pdf.loc[:,pdf['obs'] == 0]

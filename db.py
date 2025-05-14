@@ -165,6 +165,9 @@ def get_summary_for_platform(start_time, end_time, in_platform_code):
 def counts_by_week(start_time, end_time, parameter):
     # See comment in get_platform_data
     client = bigquery.Client()
+
+    
+
     week_count = '''  
             SELECT
                 geo_id AS gid,
@@ -173,15 +176,19 @@ def counts_by_week(start_time, end_time, parameter):
                 ANY_VALUE(geometry) as cell,
                 platform_type,
                 COUNT('{}') AS obs,
-                EXTRACT(WEEK from observation_date) as week
+                EXTRACT(WEEK from observation_date) as obsweek,
+                EXTRACT(YEAR from observation_date) as obsyear,
             FROM
                 `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.observations` AS nobs,
                 `aw-8a5d408d-02e1-4907-9163-b4d.OSMC.grid-5-by-5` AS grid_cells
             WHERE ST_CONTAINS(
                 grid_cells.geometry,
                 ST_GeogPoint(nobs.longitude, nobs.latitude)
-            ) and nobs.observation_date>='{}' and nobs.observation_date<='{}' and EXTRACT(week from observation_date) > 0 AND nobs.{} IS NOT NULL
-            GROUP BY gid, platform_type, week
+            ) AND nobs.observation_date>='{}' AND nobs.observation_date<'{}' 
+              AND EXTRACT(WEEK from observation_date) > 0 
+              AND EXTRACT(YEAR from observation_date) > 0 
+              AND nobs.{} IS NOT NULL
+            GROUP BY gid, platform_type, obsweek, obsyear
             ORDER BY gid     
         '''.format(parameter, start_time, end_time, parameter)
     try:
