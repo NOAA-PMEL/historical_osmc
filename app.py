@@ -118,7 +118,7 @@ else:
     # For production...
     background_callback_manager = CeleryManager(celery_app)
 
-app = EnterpriseDash(__name__, background_callback_manager=background_callback_manager, )
+app = EnterpriseDash(__name__, title='Historical OSMC', background_callback_manager=background_callback_manager, )
 server = app.server  # expose server variable for Procfile
 app.setup_shortcuts(
     # logo=app.get_asset_url('GOMO_Lockup_Outlines-2.svg'),
